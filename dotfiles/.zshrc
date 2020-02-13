@@ -99,6 +99,8 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
+alias gbdgone='git for-each-ref --format="%(upstream:track) %(refname:short)" | command grep -E "^\[gone\] " | command cut -d" " -f2 | command xargs -n 1 git branch -D'
+
 # Enable Elixir iex history
 export ERL_AFLAGS="-kernel shell_history enabled"
 
