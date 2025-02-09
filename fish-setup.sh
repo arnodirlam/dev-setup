@@ -1,6 +1,9 @@
+#!/bin/sh
+#
+# Install fish shell & fisher
 # https://www.joshfinnie.com/blog/moving-from-oh-my-zsh-to-starship-and-fish-shell/
 
-brew install fish fzf bat exa fd
+brew install fish fzf bat exa fd font-fira-code-nerd-font
 
 echo /usr/local/bin/fish | sudo tee -a /etc/shells
 chsh -s /usr/local/bin/fish
