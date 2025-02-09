@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eou pipefail
+set -exou pipefail
 
 git config --global user.name "Arno Dirlam"
 git config --global user.email "arnodirlam@googlemail.com"

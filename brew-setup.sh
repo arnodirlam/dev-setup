@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eou pipefail
+set -exou pipefail
 
 xcode-select --install
 
