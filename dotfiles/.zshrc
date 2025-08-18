@@ -51,8 +51,8 @@ ZSH_THEME_TF_PROMPT_SUFFIX=""
 # HYPHEN_INSENSITIVE="true"
 
 # Uncomment one of the following lines to change the auto-update behavior
-# zstyle ':omz:update' mode disabled  # disable automatic updates
-zstyle ':omz:update' mode auto      # update automatically without asking
+zstyle ':omz:update' mode disabled  # disable automatic updates
+# zstyle ':omz:update' mode auto      # update automatically without asking
 # zstyle ':omz:update' mode reminder  # just remind me to update when it's time
 
 # Uncomment the following line to change how often to auto-update (in days).
@@ -98,16 +98,18 @@ zstyle ':omz:update' mode auto      # update automatically without asking
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-  asdf
   aws
   brew
   colorize
+  dirhistory
   docker
   docker-compose
   elixir
+  eza
+  fzf
   git
   kubectl
-#  mise
+  mise
   per-directory-history
   terraform
   zsh-autosuggestions
@@ -121,7 +123,7 @@ fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 # ====================
 # if type brew &>/dev/null; then
 #   FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
-# 
+#
 #   autoload -Uz compinit
 #   compinit
 # fi
@@ -167,14 +169,25 @@ export HOMEBREW_NO_INSTALL_CLEANUP=true
 alias zshconfig="vim ~/.zshrc && source ~/.zshrc"
 alias ohmyzsh="vim ~/.oh-my-zsh"
 alias reload="exec $SHELL -l"
+function up() {
+  omz update
+  brew update
+  brew upgrade
+  brew cleanup
+  brew doctor
+  xattr -d com.apple.quarantine /opt/homebrew/bin/chromedriver
+  mise upgrade --cd ~/dev --yes
+}
 
+# Git
 alias grbomi='git rebase --interactive origin/$(git_main_branch)'
 alias gbdgone='git for-each-ref --format="%(upstream:track) %(refname:short)" | command grep -E "^\[gone\] " | command cut -d" " -f2 | command xargs -n 1 git branch -D'
 alias gmm='git merge origin/$(git_main_branch)'
 alias gcpn='git cherry-pick --no-commit'
 alias gprod="git fetch --all && git log --left-right --graph --cherry-pick --pretty='format:%s (%an, %ar)' origin/production...origin/master"
 alias gprodl="git fetch --all && git log --left-right --graph --cherry-pick --pretty='format:%s (%an, %ar) %H' production...origin/master"
-alias maat='java -jar /Users/arno/dev/code-maat/target/code-maat-1.1-SNAPSHOT-standalone.jar'
+alias gbase='git merge-base HEAD main'
+alias grsm="git restore --source \$(git merge-base HEAD main)"
 
 # AWS & Terraform
 alias awswmi='aws sts get-caller-identity'
@@ -240,7 +253,7 @@ alias wtf="watchexec -o queue -e 'tf' -c -- terraform plan"
 # Erlang build flags
 # ==================
 export CFLAGS="-O2 -g -fno-stack-check"
-export KERL_CONFIGURE_OPTIONS="--disable-hipe --with-ssl=$(brew --prefix openssl@3) --with-wx-config=$(brew --prefix wxwidgets)/bin/wx-config --with-odbc=$(brew --prefix unixodbc)" 
+export KERL_CONFIGURE_OPTIONS="--disable-hipe --with-ssl=$(brew --prefix openssl@3) --with-wx-config=$(brew --prefix wxwidgets)/bin/wx-config --with-odbc=$(brew --prefix unixodbc)"
 export KERL_BUILD_DOCS=yes
 export CPPFLAGS="-I$(brew --prefix unixodbc)/include"
 export LDFLAGS="-L$(brew --prefix unixodbc)/lib"
