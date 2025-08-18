@@ -1,3 +1,15 @@
+# see https://github.com/romkatv/powerlevel10k/issues/702#issuecomment-626222730
+(( ${+commands[direnv]} )) && emulate zsh -c "$(direnv export zsh)"
+
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+(( ${+commands[direnv]} )) && emulate zsh -c "$(direnv hook zsh)"
+
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -12,7 +24,9 @@ export ZSH="/Users/arno/.oh-my-zsh"
 # ZSH_THEME="fishy"
 # ZSH_THEME="robbyrussell"
 # ZSH_THEME="awesomepanda"
-ZSH_THEME="sorins2"
+# ZSH_THEME="sorins2"
+# ZSH_THEME="agnoster"
+ZSH_THEME="powerlevel10k/powerlevel10k"
 
 RPROMPT='$(tf_prompt_info)'
 ZSH_THEME_TF_PROMPT_PREFIX=""
@@ -88,7 +102,6 @@ plugins=(
   aws
   brew
   colorize
-  direnv
   docker
   docker-compose
   elixir
@@ -244,4 +257,7 @@ export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 
 # imagemaguick@6
 # export PATH="$PATH:/opt/homebrew/opt/imagemagick@6/bin"
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
