@@ -1,0 +1,9 @@
+[tools]
+elixir = "1.18.4-otp-27"
+erlang = "27.3.4"
+
+[settings]
+idiomatic_version_file_enable_tools = ["ruby"]
+
+[settings.npm]
+bun = true

@@ -137,7 +137,7 @@ import $relative_path $doit="false": && (_show-dry-run-message doit)
     # Create parent directories for source file
     source_parent_dir=$(dirname "$source_file")
     if [[ ! -d "$source_parent_dir" ]]; then
-        source_parent_dir_short=$(echo "$source_parent_dir" | sed "s|^$home_dir|~|")
+        source_parent_dir_short=$(echo "$source_parent_dir" | sed "s|^{{ home_dir }}|~|")
         echo -e "{{ BLUE }}${log_prefix}📁 Creating directory: $source_parent_dir_short{{ NORMAL }}"
         [[ "$doit" == "true" ]] && mkdir -p "$source_parent_dir"
     fi
@@ -154,7 +154,7 @@ import $relative_path $doit="false": && (_show-dry-run-message doit)
     # If target is a symlink, resolve it and copy the actual file
     if [[ -L "$target_file" ]]; then
         actual_file=$(readlink -f "$target_file")
-        actual_file_short=$(echo "$actual_file" | sed "s|^$home_dir|~|")
+        actual_file_short=$(echo "$actual_file" | sed "s|^{{ home_dir }}|~|")
         echo -e "{{ BLUE }}${log_prefix}(Resolved symlink: $actual_file_short){{ NORMAL }}"
         [[ "$doit" == "true" ]] && mv "$actual_file" "$source_file"
     else
