@@ -87,7 +87,6 @@ plugins=(
   aws
   brew
   colorize
-  direnv
   dirhistory
   docker
   docker-compose
@@ -96,7 +95,6 @@ plugins=(
   fzf
   git
   kubectl
-  mise
   per-directory-history
   terraform
   zsh-autosuggestions
