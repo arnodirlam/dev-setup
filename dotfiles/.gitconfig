@@ -1,0 +1,16 @@
+[user]
+	name = Arno Dirlam
+	email = arnodirlam@googlemail.com
+	signingkey = 826AE5FE
+[commit]
+	gpgsign = true
+[init]
+	defaultBranch = main
+[push]
+	autoSetupRemote = true
+[alias]
+  stashgrep = "!f() { for i in `git stash list --format=\"%gd\"` ; \
+            do git stash show -p $i | grep -H --label=\"$i\" \"$@\" ; done ; };"
+
+[core]
+	excludesfile = /Users/arno/.gitignore
