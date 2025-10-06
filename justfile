@@ -164,3 +164,64 @@ import $relative_path $doit="false": && (_show-dry-run-message doit)
 
     # Now create the symlink back
     [[ "$doit" == "true" ]] && ln -s "$source_file" "$target_file" || true
+
+# Install Fish shell and configure it
+setup-fish $doit="false" $make_default="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🐟 Installing Fish shell and dependencies...{{ NORMAL }}"
+
+    # Install Fish & Friends
+    echo -e "{{ BLUE }}${log_prefix}📦 Installing packages: fish, fzf, bat, fd, font-fira-code-nerd-font{{ NORMAL }}"
+    [[ "$doit" == "true" ]] && brew install fish fzf bat fd font-fira-code-nerd-font
+
+    # Add Fish to /etc/shells
+    if grep -q "/opt/homebrew/bin/fish" /etc/shells 2>/dev/null; then
+        echo -e "{{ GREEN }}${log_prefix}✅ Fish already added to /etc/shells{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}🔧 Adding fish to /etc/shells{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && echo /opt/homebrew/bin/fish | sudo tee -a /etc/shells
+    fi
+
+    # Set Fish as default shell
+    current_shell=$(dscl . -read /Users/$(whoami) UserShell | awk '{print $2}')
+    if [[ "$current_shell" == "/opt/homebrew/bin/fish" ]]; then
+        echo -e "{{ GREEN }}${log_prefix}✅ Fish already set as default shell{{ NORMAL }}"
+    elif [[ "$make_default" == "true" ]]; then
+        echo -e "{{ BLUE }}${log_prefix}🔄 Changing default shell to fish{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && chsh -s /opt/homebrew/bin/fish
+    else
+        echo -e "{{ BLUE }}${log_prefix}⏭️ Skipping default shell change (make_default=false){{ NORMAL }}"
+    fi
+
+    # Install Fisher
+    if [[ -f ~/.config/fish/functions/fisher.fish ]]; then
+        echo -e "{{ GREEN }}${log_prefix}✅ Fisher plugin manager already installed{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}🎣 Installing Fisher plugin manager{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | fish
+    fi
+
+    # Update Fisher
+    echo -e "{{ BLUE }}${log_prefix}🔄 Updating Fisher{{ NORMAL }}"
+    [[ "$doit" == "true" ]] && echo "fisher update" | fish
+
+    # Configure Tide prompt theme
+    if [[ ! -f ~/.config/fish/fish_plugins ]]; then
+        echo -e "{{ BLUE }}${log_prefix}⏭️ Skipping Tide configuration (fish_plugins not found){{ NORMAL }}"
+    elif ! grep -q "tide" ~/.config/fish/fish_plugins; then
+        echo -e "{{ BLUE }}${log_prefix}⏭️ Skipping Tide configuration (not in fish_plugins){{ NORMAL }}"
+    elif fish -c "functions -q tide" 2>/dev/null; then
+        echo -e "{{ GREEN }}${log_prefix}✅ Tide prompt already configured{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}🎨 Configuring Tide prompt theme{{ NORMAL }}"
+        tide_config="tide configure --auto --style=Rainbow --prompt_colors='True color' --show_time=No --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character' --prompt_connection=Dotted --powerline_right_prompt_frame=No --prompt_connection_andor_frame_color=Light --prompt_spacing=Sparse --icons='Few icons' --transient=Yes"
+        [[ "$doit" == "true" ]] && echo "$tide_config" | fish
+    fi
+
+    echo -e "{{ GREEN }}${log_prefix}✅ Fish shell setup complete!{{ NORMAL }}"
+    echo -e "{{ BLUE }}${log_prefix}💡 You may need to restart your terminal or run 'exec fish' to start using Fish{{ NORMAL }}"
