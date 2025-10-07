@@ -1,11 +1,15 @@
 #!/bin/sh
-set -exou pipefail
+set -euo pipefail
 
-xcode-select --install
+xcode-select --install || true
 
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+if ! command -v brew >/dev/null 2>&1; then
+  echo "🍺 Installing Homebrew..."
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+else
+  echo "✅ Homebrew is already installed, skipping installation."
+fi
 
 brew install just
 
-echo "pinentry-program $(brew --prefix)/bin/pinentry-mac" >> ~/.gnupg/gpg-agent.conf
-gpgconf --kill gpg-agent
+just bootstrap "$@"

@@ -26,6 +26,38 @@ _show-dry-run-message $doit:
         echo
     fi
 
+# Bootstrap the dev environment
+bootstrap $doit="false": (link-all doit) (brew-apply doit) && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Ask user which shell to use
+    echo
+    echo "Which shell would you like to use by default?"
+    while true; do
+        select shell_choice in "zsh" "fish" "skip (do not configure shell)"; do
+            case "$shell_choice" in
+                zsh)
+                    just setup-zsh "$doit"
+                    just set-default-shell "zsh" "$doit"
+                    break 2
+                    ;;
+                fish)
+                    just setup-fish "$doit"
+                    just set-default-shell "fish" "$doit"
+                    break 2
+                    ;;
+                "skip (do not configure shell)")
+                    echo "Skipped shell setup."
+                    break 2
+                    ;;
+                *)
+                    echo "Invalid selection. Please choose 1, 2, or 3."
+                    ;;
+            esac
+        done
+    done
+
 # Link a single file from dotfiles/ to ~/
 link $relative_path $doit="false": && (_show-dry-run-message doit)
     @just _link "$relative_path" "$doit"
@@ -167,8 +199,45 @@ import $relative_path $doit="false": && (_show-dry-run-message doit)
     # Now create the symlink back
     [[ "$doit" == "true" ]] && ln -s "$source_file" "$target_file" || true
 
+# Set the default shell for the user
+set-default-shell $shell $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    current_shell=$(dscl . -read /Users/$(whoami) UserShell | awk '{print $2}')
+    echo -e "{{ BLUE }}${log_prefix}🔄 Current shell: $current_shell{{ NORMAL }}"
+
+    shell_cmd=$(which "$shell")
+    if [[ "$current_shell" == "$shell_cmd" ]]; then
+        echo -e "{{ GREEN }}${log_prefix}✅ $shell already set as default shell{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}🔄 Changing default shell to $shell{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && chsh -s "$shell_cmd" || true
+    fi
+
+# Install and configure Oh My Zsh
+setup-zsh $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    # Install oh-my-zsh if not already installed
+    if [[ -d "$HOME/.oh-my-zsh" ]]; then
+        echo -e "{{ GREEN }}${log_prefix}✅ oh-my-zsh already installed{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}🐚 Installing oh-my-zsh...{{ NORMAL }}"
+        if [[ "$doit" == "true" ]]; then
+            RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        fi
+    fi
+
 # Install Fish shell and configure it
-setup-fish $doit="false" $make_default="false": && (_show-dry-run-message doit)
+setup-fish $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -187,17 +256,6 @@ setup-fish $doit="false" $make_default="false": && (_show-dry-run-message doit)
     else
         echo -e "{{ BLUE }}${log_prefix}🔧 Adding fish to /etc/shells{{ NORMAL }}"
         [[ "$doit" == "true" ]] && echo /opt/homebrew/bin/fish | sudo tee -a /etc/shells
-    fi
-
-    # Set Fish as default shell
-    current_shell=$(dscl . -read /Users/$(whoami) UserShell | awk '{print $2}')
-    if [[ "$current_shell" == "/opt/homebrew/bin/fish" ]]; then
-        echo -e "{{ GREEN }}${log_prefix}✅ Fish already set as default shell{{ NORMAL }}"
-    elif [[ "$make_default" == "true" ]]; then
-        echo -e "{{ BLUE }}${log_prefix}🔄 Changing default shell to fish{{ NORMAL }}"
-        [[ "$doit" == "true" ]] && chsh -s /opt/homebrew/bin/fish
-    else
-        echo -e "{{ BLUE }}${log_prefix}⏭️ Skipping default shell change (make_default=false){{ NORMAL }}"
     fi
 
     # Install Fisher
