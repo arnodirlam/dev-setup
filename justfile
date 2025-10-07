@@ -6,6 +6,7 @@
 dotfiles_dir := justfile_directory() / "dotfiles"
 home_dir := env_var('HOME')
 dotfiles_dir_short := replace_regex(dotfiles_dir, "^" + home_dir, "~")
+brewfile_path := justfile_directory() / "Brewfile"
 
 # Default recipe - show available commands
 [default]
@@ -22,6 +23,7 @@ _show-dry-run-message $doit:
         echo
         echo -e "{{ BLUE }}💡 This was a dry run. No files were actually modified.{{ NORMAL }}"
         echo -e "{{ BLUE }}   Run with doit=true to perform the actual operation.{{ NORMAL }}"
+        echo
     fi
 
 # Link a single file from dotfiles/ to ~/
@@ -99,7 +101,7 @@ link-all $doit="false": && (_show-dry-run-message doit)
 
     # Find all files in dotfiles directory and process them
     if ! find "{{ dotfiles_dir }}" -type f -exec just _link {} "$doit" \; ; then
-        echo -e "{{ RED }}❌ Error: Failed to process dotfiles directory{{ NORMAL }}"
+        echo -e "{{ RED }}❌ Error: Failed to process dotfiles directory{{ NORMAL }}" >&2
         exit 1
     fi
 
@@ -225,3 +227,43 @@ setup-fish $doit="false" $make_default="false": && (_show-dry-run-message doit)
 
     echo -e "{{ GREEN }}${log_prefix}✅ Fish shell setup complete!{{ NORMAL }}"
     echo -e "{{ BLUE }}${log_prefix}💡 You may need to restart your terminal or run 'exec fish' to start using Fish{{ NORMAL }}"
+
+# Generate Brewfile from currently installed packages
+brew-dump $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🍺 Generating Brewfile from installed packages...{{ NORMAL }}"
+
+    [[ "$doit" == "true" ]] && brew bundle dump --file="{{ brewfile_path }}" --force --no-vscode
+    echo -e "{{ GREEN }}${log_prefix}✅ Brewfile generated from installed packages!{{ NORMAL }}"
+
+# Apply Brewfile, (un)installing packages, casks and taps as needed
+brew-apply $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if Brewfile exists
+    if [[ ! -f "{{ brewfile_path }}" ]]; then
+        echo -e "{{ RED }}❌ Brewfile not found at {{ brewfile_path }}{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Run 'just brew-dump true' to generate a Brewfile from installed packages{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🍺 Applying changes from Brewfile...{{ NORMAL }}"
+
+    # Install from Brewfile
+    if [[ "$doit" == "true" ]]; then
+        brew bundle --cleanup --file="{{ brewfile_path }}" | grep -v '^Using '
+    else
+        brew bundle check --file="{{ brewfile_path }}"
+        echo
+        brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
+        echo
+    fi
