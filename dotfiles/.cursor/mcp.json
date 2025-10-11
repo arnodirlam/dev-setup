@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "Context7": {
+      "command": "direnv",
+      "args": [
+        "exec",
+        "${workspaceFolder}",
+        "bunx",
+        "--bun",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "GitHub": {
+      "command": "direnv",
+      "args": [
+        "exec",
+        "${workspaceFolder}",
+        "docker",
+        "run",
+        "--name",
+        "github-mcp-${workspaceFolderBasename}",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_TOOLSETS=pull_requests",
+        "ghcr.io/github/github-mcp-server"
+      ]
+    },
+    "Linear": {
+      "url": "https://mcp.linear.app/sse"
+    },
+    "Mobile MCP": {
+      "command": "bunx",
+      "args": ["--bun", "@mobilenext/mobile-mcp"]
+    }
+  }
+}
