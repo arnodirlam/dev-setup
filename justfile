@@ -13,6 +13,13 @@ brewfile_path := justfile_directory() / "Brewfile"
 _default:
     @just --list
 
+check: test
+
+test: test-cursor-hooks
+
+test-cursor-hooks:
+    @{{ dotfiles_dir }}/.cursor/hooks/test-prevent-secret-exposure.sh
+
 # Private command to show dry-run message
 _show-dry-run-message $doit:
     #!/usr/bin/env bash
@@ -325,3 +332,108 @@ brew-apply $doit="false": && (_show-dry-run-message doit)
         brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
         echo
     fi
+
+# List Elixir dependency package names used across stale projects in ~/dev
+list-elixir-packages $verbose="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    root_dir="${HOME}/dev"
+
+    if [[ ! -d "$root_dir" ]]; then
+        echo "❌ Directory not found: $root_dir" >&2
+        exit 1
+    fi
+
+    # Two years in seconds (365 days * 2)
+    two_years_secs=$((365 * 2 * 24 * 60 * 60))
+    now_epoch=$(date +%s)
+
+    # Cross-platform stat mtime helper (macOS vs GNU)
+    get_mtime() {
+        local path="$1"
+        if stat -f %m "$path" >/dev/null 2>&1; then
+            stat -f %m "$path"    # macOS / BSD
+        else
+            stat -c %Y "$path"    # GNU
+        fi
+    }
+
+    # Determine if a directory is stale (not modified in the last two years)
+    is_stale_dir() {
+        local dir="$1"
+        local mtime
+        mtime=$(get_mtime "$dir") || return 1
+        local age=$((now_epoch - mtime))
+        [[ "$age" -ge "$two_years_secs" ]]
+    }
+
+    # Extract dependency atoms from a mix.exs file
+    extract_deps() {
+        local mix_file="$1"
+        # Pull text between 'defp deps do' and the matching 'end', then
+        # find tuples starting with an atom like {:ecto, ...}
+        awk 'BEGIN{inblock=0} /defp[[:space:]]+deps[[:space:]]*do/{inblock=1} inblock{print} /^[[:space:]]*end[[:space:]]*$/&&inblock{exit}' "$mix_file" \
+        | sed 's/#.*$//' \
+        | grep -Eo "\{:[a-zA-Z0-9_]+[[:space:],}]" || true
+    }
+
+    # Accumulate package names and track stats
+    tmp_packages=$(mktemp)
+    tmp_nonstale=$(mktemp)
+    trap 'rm -f "$tmp_packages" "$tmp_nonstale"' EXIT
+
+    total_mix_files=0
+    stale_mix_files=0
+    dep_tuple_count=0
+
+    # Find all mix.exs files and process those in stale directories
+    while IFS= read -r -d '' mix_file; do
+        total_mix_files=$((total_mix_files + 1))
+        dir="$(dirname "$mix_file")"
+        if is_stale_dir "$dir"; then
+            stale_mix_files=$((stale_mix_files + 1))
+            # Extract deps and write package atoms to temp file
+            while IFS= read -r tuple; do
+                # tuple looks like '{:ecto,' or '{:ecto }' -> strip to atom name
+                pkg=$(echo "$tuple" | sed -E 's/^\{:([a-zA-Z0-9_]+).*/\1/')
+                if [[ -n "$pkg" ]]; then
+                    dep_tuple_count=$((dep_tuple_count + 1))
+                    echo "$pkg" >> "$tmp_packages"
+                fi
+            done < <(extract_deps "$mix_file")
+        else
+            echo "$mix_file" >> "$tmp_nonstale"
+        fi
+    done < <(find "$root_dir" -type d -name deps -prune -o -type f -name mix.exs -print0)
+
+    if [[ ! -s "$tmp_packages" ]]; then
+        echo "No dependencies found in stale projects under $root_dir" >&2
+        exit 0
+    fi
+
+    # Rank by occurrences and output: count package
+    total_occurrences=$(wc -l < "$tmp_packages" | awk '{print $1}')
+    unique_packages=$(sort "$tmp_packages" | uniq | wc -l | awk '{print $1}')
+
+    non_stale_count=$((total_mix_files - stale_mix_files))
+    echo "Stats:"
+    echo "  mix.exs found:        $total_mix_files"
+    echo "  stale mix.exs:        $stale_mix_files"
+    echo "  non-stale mix.exs:    $non_stale_count"
+    echo "  dependency tuples:    $dep_tuple_count"
+    echo "  total occurrences:    $total_occurrences"
+    echo "  unique packages:      $unique_packages"
+    echo
+
+    if [[ "$verbose" == "true" ]]; then
+        if [[ -s "$tmp_nonstale" ]]; then
+            echo "Non-stale mix.exs files:"
+            sort "$tmp_nonstale"
+            echo
+        else
+            echo "Non-stale mix.exs files: (none)"
+            echo
+        fi
+    fi
+    sort "$tmp_packages" | uniq -c | sort -nr | awk '{printf "%6d %s\n", $1, $2}'
