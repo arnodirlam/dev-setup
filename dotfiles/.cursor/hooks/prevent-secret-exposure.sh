@@ -93,7 +93,7 @@ respond_deny() {
   msg="${msg//\"/\\\"}"
   agent_msg="${agent_msg//\"/\\\"}"
 
-  echo "{\"permission\":\"deny\",\"userMessage\":\"🛑 $msg\n\nCommand:\n$cmd_escaped\",\"agentMessage\":\"$agent_msg\"}"
+  echo "{\"permission\":\"deny\",\"userMessage\":\"🛑 $msg\n\n$cmd_escaped\",\"agentMessage\":\"$agent_msg\"}"
   exit 0
 }
 
