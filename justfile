@@ -466,10 +466,58 @@ brew-apply $doit="false": && (_show-dry-run-message doit)
     if [[ "$doit" == "true" ]]; then
         brew bundle --cleanup --file="{{ brewfile_path }}" | grep -v '^Using '
     else
-        brew bundle check --file="{{ brewfile_path }}"
+        brew bundle check --no-upgrade --verbose --file="{{ brewfile_path }}" 2>&1 | grep -v -i 'satisfy.*dependencies' && echo "No packages to install." || true
         echo
         brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
         echo
+    fi
+
+# Install packages from Brewfile
+brew-install $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if Brewfile exists
+    if [[ ! -f "{{ brewfile_path }}" ]]; then
+        echo -e "{{ RED }}❌ Brewfile not found at {{ brewfile_path }}{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Run 'just brew-dump true' to generate a Brewfile from installed packages{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🍺 Installing packages from Brewfile...{{ NORMAL }}"
+
+    # Install from Brewfile (without cleanup)
+    if [[ "$doit" == "true" ]]; then
+        brew bundle --no-upgrade --file="{{ brewfile_path }}" | grep -v '^Using '
+    else
+        brew bundle check --no-upgrade --verbose --file="{{ brewfile_path }}" 2>&1 | grep -v -i 'satisfy.*dependencies' && echo "No packages to install." || true
+    fi
+
+# Remove packages not in Brewfile
+brew-purge $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if Brewfile exists
+    if [[ ! -f "{{ brewfile_path }}" ]]; then
+        echo -e "{{ RED }}❌ Brewfile not found at {{ brewfile_path }}{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Run 'just brew-dump true' to generate a Brewfile from installed packages{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🍺 Removing packages not in Brewfile...{{ NORMAL }}"
+
+    # Clean up packages not in Brewfile
+    if [[ "$doit" == "true" ]]; then
+        brew bundle cleanup --force --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
+    else
+        brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
     fi
 
 # List Elixir dependency package names used across stale projects in ~/dev

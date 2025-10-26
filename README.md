@@ -84,6 +84,12 @@ Sync installed Homebrew packages, casks, and taps from/to the [Brewfile](Brewfil
 # Apply Brewfile, installing/uninstalling packages as needed
 just brew-apply [doit=true]
 
+# Install only new packages from Brewfile (no updates)
+just brew-install [doit=true]
+
+# Remove packages not listed in Brewfile
+just brew-purge [doit=true]
+
 # Generate Brewfile from currently installed packages
 just brew-dump [doit=true]
 ```
@@ -165,42 +171,6 @@ You'll see output like:
 3. **Keep Brewfile updated**: Run `just brew-dump doit=true` after installing new packages
 4. **Version control your changes**: This repository is meant to be kept in git
 5. **Customize dotfiles**: Edit files in [dotfiles/](dotfiles) and changes appear in `~/` immediately (via symlinks)
-
-## Examples
-
-**Set up a new machine:**
-```bash
-# Clone this repository
-git clone https://github.com/arnodirlam/dev-setup.git ~/dev/dev-setup
-cd ~/dev/dev-setup
-
-# Preview what will happen
-just bootstrap
-
-# Perform the full setup
-just bootstrap doit=true
-```
-
-**Add a new dotfile:**
-```bash
-# Import existing file from home directory
-just import .config/starship.toml doit=true
-
-# Edit it in the repository
-vim dotfiles/.config/starship.toml
-
-# Changes are automatically reflected in ~/ (via symlink)
-```
-
-**Update packages:**
-```bash
-# Add packages to Brewfile manually, then:
-just brew-apply doit=true
-
-# Or, install packages normally and export:
-brew install ripgrep
-just brew-dump doit=true
-```
 
 ## License
 
