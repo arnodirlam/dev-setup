@@ -7,6 +7,7 @@ dotfiles_dir := justfile_directory() / "dotfiles"
 home_dir := env_var('HOME')
 dotfiles_dir_short := replace_regex(dotfiles_dir, "^" + home_dir, "~")
 brewfile_path := justfile_directory() / "Brewfile"
+plugins_file := justfile_directory() / "omz_plugins"
 
 # Default recipe - show available commands
 [default]
@@ -292,6 +293,134 @@ setup-fish $doit="false": && (_show-dry-run-message doit)
 
     echo -e "{{ GREEN }}${log_prefix}✅ Fish shell setup complete!{{ NORMAL }}"
     echo -e "{{ BLUE }}${log_prefix}💡 You may need to restart your terminal or run 'exec fish' to start using Fish{{ NORMAL }}"
+
+# Export oh-my-zsh custom plugins to file
+omz-plugins-dump:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    plugins_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+
+    # Check if plugins directory exists
+    if [[ ! -d "$plugins_dir" ]]; then
+        echo -e "{{ RED }}❌ Oh-my-zsh custom plugins directory not found: $plugins_dir{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Install oh-my-zsh first with 'just setup-zsh true'{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    echo -e "{{ BLUE }}📦 Exporting custom plugins from $plugins_dir...{{ NORMAL }}"
+
+    # Collect git remote URLs
+    temp_file=$(mktemp)
+
+    # Find directories with .git subdirectory
+    while IFS= read -r plugin_dir; do
+        [[ -z "$plugin_dir" ]] && continue
+        plugin_name=$(basename "$plugin_dir")
+
+        # Get git remote URL
+        remote_url=$(git -C "$plugin_dir" remote get-url origin 2>/dev/null)
+        if [[ -n "$remote_url" ]]; then
+            # Write as: plugin_name<TAB>git_url
+            printf "%s\t%s\n" "$plugin_name" "$remote_url" >> "$temp_file"
+            echo -e "{{ GREEN }}✅ Found: $plugin_name -> $remote_url{{ NORMAL }}"
+        else
+            echo -e "{{ YELLOW }}⚠️  Skipping $plugin_name (no remote configured){{ NORMAL }}"
+        fi
+    done < <(find "$plugins_dir" -mindepth 2 -maxdepth 2 -type d -name .git -exec dirname {} \;)
+
+    # Write to output file (sorted alphabetically)
+    sort "$temp_file" > "{{ plugins_file }}"
+    rm -f "$temp_file"
+
+# Install oh-my-zsh custom plugins from file
+omz-plugins-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if plugins file exists
+    if [[ ! -f "{{ plugins_file }}" ]]; then
+        echo -e "{{ RED }}❌ Plugins file not found: {{ plugins_file }}{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Run 'just omz-plugins-dump' to export plugins first{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    plugins_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+
+    # Check if plugins directory exists
+    if [[ ! -d "$plugins_dir" ]]; then
+        echo -e "{{ RED }}❌ Oh-my-zsh custom plugins directory not found: $plugins_dir{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Install oh-my-zsh first with 'just setup-zsh true'{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    echo -e "{{ BLUE }}📦 Installing plugins to $plugins_dir...{{ NORMAL }}"
+
+    # Read plugin names and URLs from file (format: plugin_name<TAB>url)
+    while IFS=$'\t' read -r plugin_name url || [[ -n "$plugin_name" ]]; do
+        # Skip empty lines
+        if [[ -z "$plugin_name" ]] || [[ -z "$url" ]]; then
+            continue
+        fi
+
+        target_dir="$plugins_dir/$plugin_name"
+
+        # Check if plugin already exists
+        if [[ -d "$target_dir" ]]; then
+            echo -e "{{ GREEN }}✅ Already installed: $plugin_name{{ NORMAL }}"
+            continue
+        fi
+
+        # Clone the plugin
+        echo -e "{{ BLUE }}📥 Installing: $plugin_name from $url{{ NORMAL }}"
+        if git clone "$url" "$target_dir" 2>/dev/null; then
+            echo -e "{{ GREEN }}✅ Installed: $plugin_name{{ NORMAL }}"
+        else
+            echo -e "{{ RED }}❌ Failed to install: $plugin_name{{ NORMAL }}"
+        fi
+    done < "{{ plugins_file }}"
+
+# Update oh-my-zsh custom plugins
+zsh-plugins-update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    plugins_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+
+    # Check if plugins directory exists
+    if [[ ! -d "$plugins_dir" ]]; then
+        echo -e "{{ RED }}❌ Oh-my-zsh custom plugins directory not found: $plugins_dir{{ NORMAL }}" >&2
+        echo -e "{{ BLUE }}💡 Install oh-my-zsh first with 'just setup-zsh true'{{ NORMAL }}" >&2
+        exit 1
+    fi
+
+    echo -e "{{ BLUE }}🔄 Updating custom plugins in $plugins_dir...{{ NORMAL }}"
+
+    # Update each plugin directory that is a git repository
+    while IFS= read -r plugin_dir; do
+        [[ -z "$plugin_dir" ]] && continue
+        plugin_name=$(basename "$plugin_dir")
+
+        if git -C "$plugin_dir" rev-parse --git-dir >/dev/null 2>&1; then
+            # Fetch latest changes from remote
+            git -C "$plugin_dir" fetch --quiet >/dev/null 2>&1 || true
+
+            # Check if there are updates available
+            local_commit=$(git -C "$plugin_dir" rev-parse HEAD)
+            remote_commit=$(git -C "$plugin_dir" rev-parse @{u} 2>/dev/null || echo "$local_commit")
+
+            if [[ "$local_commit" == "$remote_commit" ]]; then
+                echo -e "{{ GREEN }}✅ Up to date: $plugin_name{{ NORMAL }}"
+            else
+                echo -e "{{ BLUE }}🔄 Updating: $plugin_name{{ NORMAL }}"
+                if git -C "$plugin_dir" pull --quiet >/dev/null 2>&1; then
+                    echo -e "{{ GREEN }}✅ Updated: $plugin_name{{ NORMAL }}"
+                else
+                    echo -e "{{ RED }}❌ Failed to update: $plugin_name{{ NORMAL }}"
+                fi
+            fi
+        fi
+    done < <(find "$plugins_dir" -mindepth 2 -maxdepth 2 -type d -name .git -exec dirname {} \; | sort)
 
 # Generate Brewfile from currently installed packages
 brew-dump $doit="false": && (_show-dry-run-message doit)

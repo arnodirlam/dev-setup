@@ -86,6 +86,7 @@ zstyle ':omz:update' mode disabled  # disable automatic updates
 plugins=(
   aws
   brew
+  command-not-found
   colorize
   dirhistory
   docker
@@ -95,27 +96,62 @@ plugins=(
   fzf
   git
   kubectl
+  magic-enter
   per-directory-history
   terraform
+  fzf-tab
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
 
+# Homebrew zsh-completions
+# =========================
 # see https://github.com/zsh-users/zsh-completions
-fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
+if type brew &>/dev/null; then
+  FPATH="$(brew --prefix)/share/zsh-completions:$FPATH"
 
-# Homebrew completions
-# ====================
-# if type brew &>/dev/null; then
-#   FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
-#
-#   autoload -Uz compinit
-#   compinit
-# fi
+  autoload -Uz compinit
+  compinit
+fi
 
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
+
+# fzf-tab configuration
+# ====================
+# Open in tmux popup if on tmux, otherwise use --height mode
+export FZF_DEFAULT_OPTS='--height 40% --tmux bottom,40% --layout reverse --border top'
+export FZF_CTRL_R_OPTS='--bind=esc:print-query'
+# CTRL+T file search with bat preview
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
+
+# Disable default completion menu to let fzf-tab take over
+zstyle ':completion:*' menu no
+# Enable filename colorizing
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+# Set description format for group support
+zstyle ':completion:*:descriptions' format '[%d]'
+
+# Preview directory contents when completing cd
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || tree -C $realpath 2>/dev/null || ls -1 $realpath'
+# Preview files for file/directory arguments (more selective)
+zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'bat --style=numbers --color=always --line-range :500 $realpath 2>/dev/null || tree -C $realpath 2>/dev/null'
+# Preview file contents for common file-handling commands
+zstyle ':fzf-tab:complete:(cat|bat|less|vim|nvim|nano|emacs):*' fzf-preview 'bat --style=numbers --color=always --line-range :500 $realpath 2>/dev/null'
+
+# Custom preview function for fzf completions (** trigger)
+_fzf_comprun() {
+  local command=$1
+  shift
+
+  case "$command" in
+    cd)           fzf "$@" --preview 'tree -C {} | head -200' ;;
+    export|unset) fzf "$@" --preview "eval 'echo \$'{}" ;;
+    ssh)          fzf "$@" --preview 'dig {}' ;;
+    *)            fzf "$@" --preview 'bat --style=numbers --color=always --line-range :500 {} 2>/dev/null || tree -C {} 2>/dev/null' ;;
+  esac
+}
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
@@ -172,7 +208,9 @@ alias gcpn='git cherry-pick --no-commit'
 alias gprod="git fetch --all && git log --left-right --graph --cherry-pick --pretty='format:%s (%an, %ar)' origin/production...origin/master"
 alias gprodl="git fetch --all && git log --left-right --graph --cherry-pick --pretty='format:%s (%an, %ar) %H' production...origin/master"
 alias gbase='git merge-base HEAD main'
+alias grevn='git revert --no-commit'
 alias grsm="git restore --source \$(git merge-base HEAD main)"
+alias gundo='git reset --soft HEAD~1'
 
 # AWS & Terraform
 alias awswmi='aws sts get-caller-identity'
