@@ -244,6 +244,9 @@ setup-zsh $doit="false": && (_show-dry-run-message doit)
         fi
     fi
 
+    # Install oh-my-zsh custom plugins
+    just omz-plugins-install "$doit"
+
 # Install Fish shell and configure it
 setup-fish $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
@@ -295,9 +298,12 @@ setup-fish $doit="false": && (_show-dry-run-message doit)
     echo -e "{{ BLUE }}${log_prefix}💡 You may need to restart your terminal or run 'exec fish' to start using Fish{{ NORMAL }}"
 
 # Export oh-my-zsh custom plugins to file
-omz-plugins-dump:
+omz-plugins-dump $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
     plugins_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
 
@@ -308,7 +314,7 @@ omz-plugins-dump:
         exit 1
     fi
 
-    echo -e "{{ BLUE }}📦 Exporting custom plugins from $plugins_dir...{{ NORMAL }}"
+    echo -e "{{ BLUE }}${log_prefix}📦 Exporting custom plugins from $plugins_dir...{{ NORMAL }}"
 
     # Collect git remote URLs
     temp_file=$(mktemp)
@@ -323,20 +329,24 @@ omz-plugins-dump:
         if [[ -n "$remote_url" ]]; then
             # Write as: plugin_name<TAB>git_url
             printf "%s\t%s\n" "$plugin_name" "$remote_url" >> "$temp_file"
-            echo -e "{{ GREEN }}✅ Found: $plugin_name -> $remote_url{{ NORMAL }}"
+            echo -e "{{ GREEN }}${log_prefix}✅ Found: $plugin_name -> $remote_url{{ NORMAL }}"
         else
-            echo -e "{{ YELLOW }}⚠️  Skipping $plugin_name (no remote configured){{ NORMAL }}"
+            echo -e "{{ YELLOW }}${log_prefix}⚠️  Skipping $plugin_name (no remote configured){{ NORMAL }}"
         fi
     done < <(find "$plugins_dir" -mindepth 2 -maxdepth 2 -type d -name .git -exec dirname {} \;)
 
     # Write to output file (sorted alphabetically)
-    sort "$temp_file" > "{{ plugins_file }}"
+    echo -e "{{ BLUE }}${log_prefix}📝 Writing plugins to {{ plugins_file }}...{{ NORMAL }}"
+    [[ "$doit" == "true" ]] && sort "$temp_file" > "{{ plugins_file }}" || true
     rm -f "$temp_file"
 
 # Install oh-my-zsh custom plugins from file
-omz-plugins-install:
+omz-plugins-install $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
     # Check if plugins file exists
     if [[ ! -f "{{ plugins_file }}" ]]; then
@@ -354,7 +364,7 @@ omz-plugins-install:
         exit 1
     fi
 
-    echo -e "{{ BLUE }}📦 Installing plugins to $plugins_dir...{{ NORMAL }}"
+    echo -e "{{ BLUE }}${log_prefix}📦 Installing plugins to $plugins_dir...{{ NORMAL }}"
 
     # Read plugin names and URLs from file (format: plugin_name<TAB>url)
     while IFS=$'\t' read -r plugin_name url || [[ -n "$plugin_name" ]]; do
@@ -367,16 +377,16 @@ omz-plugins-install:
 
         # Check if plugin already exists
         if [[ -d "$target_dir" ]]; then
-            echo -e "{{ GREEN }}✅ Already installed: $plugin_name{{ NORMAL }}"
+            echo -e "{{ GREEN }}${log_prefix}✅ Already installed: $plugin_name{{ NORMAL }}"
             continue
         fi
 
         # Clone the plugin
-        echo -e "{{ BLUE }}📥 Installing: $plugin_name from $url{{ NORMAL }}"
-        if git clone "$url" "$target_dir" 2>/dev/null; then
-            echo -e "{{ GREEN }}✅ Installed: $plugin_name{{ NORMAL }}"
-        else
-            echo -e "{{ RED }}❌ Failed to install: $plugin_name{{ NORMAL }}"
+        echo -e "{{ BLUE }}${log_prefix}📥 Installing: $plugin_name from $url{{ NORMAL }}"
+        if [[ "$doit" == "true" ]]; then
+            if ! git clone "$url" "$target_dir" 2>/dev/null; then
+                echo -e "{{ RED }}❌ Failed to install: $plugin_name{{ NORMAL }}"
+            fi
         fi
     done < "{{ plugins_file }}"
 
