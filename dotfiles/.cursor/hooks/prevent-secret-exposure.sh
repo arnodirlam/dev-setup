@@ -166,12 +166,26 @@ fi
 sensitive_var_cached=""
 sensitive_var_checked=false
 
-if [[ ! "$command" =~ \| ]]; then
-  # Check for printenv/env/export without arguments (prints all variables)
-  if [[ "$command" =~ ^[[:space:]]*(printenv|env|export)[[:space:]]*$ ]]; then
-    respond_ask "Command prints all environment variables (may include secrets)"
-  fi
+# Check for commands that dump all environment variables (runs for all commands, including piped)
+# Match: env, printenv with no args (or followed by |;&); export with -p/-- or at end
+# Use [[:space:]]*([|;&]|$) so printenv VAR / env VAR don't match (they have a word after space)
+if [[ "$command" =~ (^|[[:space:];|&/])(printenv|env)[[:space:]]*([|;&]|$) ]] || \
+   [[ "$command" =~ (^|[[:space:];|&/])export[[:space:]]+(-p|--) ]] || \
+   [[ "$command" =~ (^|[[:space:];|&/])export[[:space:]]*([|;&]|$) ]]; then
+  respond_ask "Command may print all environment variables (may include secrets)"
+fi
 
+# Check for process substitution that dumps environment
+if [[ "$command" =~ \<\([[:space:]]*(env|printenv|export) ]]; then
+  respond_ask "Command uses process substitution to read environment (may include secrets)"
+fi
+
+# Check for eval - can execute arbitrary code including hidden variable access
+if [[ "$command" =~ (^|[[:space:];|&/])eval[[:space:]] ]]; then
+  respond_ask "Command uses eval which can execute arbitrary code"
+fi
+
+if [[ ! "$command" =~ \| ]]; then
   # For printenv with specific variable, extract the variable name
   # Handle quoted and unquoted variable names: printenv PASSWORD, printenv "PASSWORD"
   if [[ "$command" =~ ^[[:space:]]*printenv[[:space:]]+[\"\']?([A-Z_][A-Z0-9_]*)[\"\']? ]]; then
@@ -181,8 +195,8 @@ if [[ ! "$command" =~ \| ]]; then
     fi
   fi
 
-  # Check for echo with $VAR patterns
-  if [[ "$command" =~ ^[[:space:]]*echo[[:space:]]+ ]]; then
+  # Check for echo or printf with $VAR patterns
+  if [[ "$command" =~ ^[[:space:]]*(echo|printf)[[:space:]]+ ]]; then
     sensitive_var_cached=$(find_sensitive_var_in_command "$command" || true)
     sensitive_var_checked=true
     if [ "$sensitive_var_cached" = "<<TOO_MANY_VARS>>" ]; then

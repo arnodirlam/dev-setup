@@ -272,6 +272,12 @@ assert_permission "deny" "echo \${PASSWORD:?error}"
 assert_permission "deny" "echo \${TOKEN#prefix}"
 assert_permission "deny" "echo \${AWS_SECRET_KEY%suffix}"
 
+# printf with sensitive variables
+assert_permission "deny" "printf \"%s\" \$SECRET" "printf with sensitive var"
+assert_permission "deny" "printf \"%s\\n\" \$API_KEY" "printf with format and sensitive var"
+assert_permission "deny" "printf \$PASSWORD" "printf with just sensitive var"
+assert_permission "deny" "printf \"\${TOKEN}\"" "printf with braced sensitive var"
+
 # ------------------------------------------------------------------------------
 # TIER 2: ASK Tests (Commands requiring user approval)
 # ------------------------------------------------------------------------------
@@ -324,6 +330,26 @@ assert_permission "ask" "echo \${PASSWORD} | grep foo"
 assert_permission "ask" "printenv"
 assert_permission "ask" "env"
 assert_permission "ask" "export"
+
+# Environment dump commands with paths/flags
+assert_permission "ask" "/usr/bin/printenv" "printenv with full path"
+assert_permission "ask" "/usr/bin/env" "env with full path"
+assert_permission "ask" "/bin/env" "env with /bin path"
+assert_permission "ask" "export -p" "export with -p flag"
+assert_permission "ask" "export --" "export with -- flag"
+assert_permission "ask" "env | cat" "env piped to cat"
+assert_permission "ask" "printenv | less" "printenv piped to less"
+
+# Process substitution
+assert_permission "ask" "cat <(env)" "process substitution with env"
+assert_permission "ask" "cat <(printenv)" "process substitution with printenv"
+assert_permission "ask" "cat <( env )" "process substitution with spaces"
+assert_permission "ask" "less <(export -p)" "process substitution with export -p"
+
+# eval commands
+assert_permission "ask" "eval \"echo hello\"" "eval with simple command"
+assert_permission "ask" "eval \"echo \\\$SECRET\"" "eval with escaped sensitive var"
+assert_permission "ask" "eval 'printenv'" "eval with printenv"
 
 # Grepping for sensitive patterns
 assert_permission "ask" "env | grep KEY"
@@ -458,6 +484,11 @@ assert_permission "allow" "open ~/.ssh/public.key"
 
 # Grep searching FOR ".env" as a pattern in other files - should be ALLOWED
 assert_permission "allow" "grep '.env' README.md"
+
+# Commands containing 'env' as substring - should NOT trigger env-dump check
+assert_permission "allow" "cat environment.txt" "file containing env substring"
+assert_permission "allow" "echo \$ENVIRONMENT" "ENVIRONMENT variable (not sensitive)"
+assert_permission "allow" "ls /etc/environment" "path containing environment"
 
 # Safe command substitution and backticks
 assert_permission "allow" "echo \$(pwd)"
