@@ -34,8 +34,37 @@ _show-dry-run-message $doit:
         echo
     fi
 
+# Replace hardcoded home paths with actual $HOME
+replace-home-paths $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    echo -e "{{ BLUE }}${log_prefix}🏠 Replacing /Users/arno with $HOME in dotfiles...{{ NORMAL }}"
+
+    # Find files containing the old path
+    while IFS= read -r file; do
+        echo -e "{{ GREEN }}${log_prefix}📝 Updating: $file{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && sed -i '' "s|/Users/arno|$HOME|g" "$file" || true
+    done < <(grep -rl "/Users/arno" "{{ dotfiles_dir }}" 2>/dev/null || true)
+
+# Create ~/dev directory
+create-dev-dir $doit="false": && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
+
+    if [[ -d "$HOME/dev" ]]; then
+        echo -e "{{ GREEN }}${log_prefix}✅ ~/dev directory already exists{{ NORMAL }}"
+    else
+        echo -e "{{ BLUE }}${log_prefix}📁 Creating ~/dev directory{{ NORMAL }}"
+        [[ "$doit" == "true" ]] && mkdir -p "$HOME/dev" || true
+    fi
+
 # Bootstrap the dev environment
-bootstrap $doit="false": (link-all doit) (brew-apply doit) && (_show-dry-run-message doit)
+bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (link-all doit) (brew-apply doit) && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
