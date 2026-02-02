@@ -1,0 +1,121 @@
+# Starship configuration
+# ======================
+# Reference:
+# - https://starship.rs/config/
+# - @https://raw.githubusercontent.com/starship/starship/refs/heads/master/docs/config/README.md
+
+# Add a newline before the prompt
+add_newline = true
+
+# Disable the package version, if you're not interested in it
+[package]
+disabled = true
+
+# You can also replace the "❯" symbol in the prompt with something else
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+# The default prompt format is:
+# `<username>@<hostname> <directory> <git_branch> <git_state> <git_status> <command_duration> <character>`
+
+# Directory configuration
+[directory]
+style = "bold cyan"
+truncation_length = 3
+truncation_symbol = "…/"
+home_symbol = "~"
+
+# Command duration
+[cmd_duration]
+min_time = 2000
+format = "took [$duration](bold yellow)"
+
+[git_branch]
+format = '[$symbol$branch(:$remote_branch)]($style)'
+symbol = ''
+truncation_length = 24
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+stashed = ''
+untracked = '✳️'
+modified = '✏️'
+staged = '✅'
+deleted = '❌'
+renamed = '➡️'
+conflicted = '🚧'
+
+# AWS module - explicitly disabled to prevent any AWS info from showing
+[aws]
+disabled = true
+
+# AWS region module - only shows when AWS_REGION is set
+[env_var.AWS_REGION]
+variable = "AWS_REGION"
+format = "☁️[$env_value]($style) "
+style = "bold yellow"
+
+[gcloud]
+disabled = true
+
+# Terraform module
+[terraform]
+symbol = "💠"
+style = "bold purple"
+
+[bun]
+disabled = true
+
+# Docker module
+[docker_context]
+format = "[$symbol]($style) "
+symbol = "🐳"
+style = "bold blue"
+only_with_files = true
+
+# Node.js module
+[nodejs]
+disabled = true
+
+# Python module
+[python]
+symbol = "🐍"
+style = "bold yellow"
+
+# Rust module
+[rust]
+symbol = "🦀"
+style = "bold red"
+
+# Go module
+[golang]
+symbol = "🐹"
+style = "bold cyan"
+
+# Elixir module
+[elixir]
+symbol = "💧"
+style = "#714A94"
+# format = '[$symbol($version-otp-$otp_version)]($style) '
+format = '[$symbol($version)]($style) '
+
+# Java module - disabled
+[java]
+disabled = true
+
+# Memory usage
+[memory_usage]
+symbol = "🐏"
+threshold = 70
+style = "bold dimmed red"
+
+# Battery
+[battery]
+full_symbol = "🔋"
+charging_symbol = "⚡️"
+discharging_symbol = "💀"
+
+# Time - disabled
+[time]
+disabled = true

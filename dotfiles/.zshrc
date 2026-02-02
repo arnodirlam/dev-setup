@@ -116,6 +116,11 @@ fi
 
 source $ZSH/oh-my-zsh.sh
 
+# Starship prompt
+# ===============
+# Initialize Starship AFTER Oh My Zsh to ensure proper hook integration
+eval "$(starship init zsh)"
+
 # User configuration
 
 # fzf-tab configuration
@@ -180,6 +185,9 @@ export HOMEBREW_BAT=true
 export HOMEBREW_INSTALL_BADGE="✅"
 export HOMEBREW_NO_AUTO_UPDATE=true
 export HOMEBREW_NO_INSTALL_CLEANUP=true
+
+# hide user and hostname in terminal title
+ZSH_THEME_TERM_TITLE_IDLE="%~"
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh

@@ -1,0 +1,32 @@
+# Run `ghostty +show-config --default --docs` to view a list of
+# all available config options and their default values.
+#
+# Additionally, each config option is also explained in detail
+# on Ghostty's website, at https://ghostty.org/docs/config.
+#
+# Ghostty can reload the configuration while running by using the menu
+# options or the bound key (default: Command + Shift + comma on macOS and
+# Control + Shift + comma on other platforms). Not all config options can be
+# reloaded while running; some only apply to new windows and others may require
+# a full restart to take effect.
+
+theme = dark:Monokai Pro Spectrum,light:Bluloco Light
+
+quit-after-last-window-closed = true
+working-directory = /Users/arno/dev
+
+window-inherit-working-directory = false
+tab-inherit-working-directory = false
+split-inherit-working-directory = true
+
+macos-window-buttons = hidden
+macos-titlebar-style = tabs
+
+# macos-icon = chalkboard
+macos-icon = custom-style
+macos-icon-ghost-color = #eeeeee
+macos-icon-screen-color = #000000
+macos-icon-frame = plastic
+
+keybind = cmd+d=new_split:down
+keybind = cmd+shift+d=new_split:right
