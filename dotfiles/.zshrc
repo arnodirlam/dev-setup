@@ -14,15 +14,6 @@ export ZSH="/Users/arno/.oh-my-zsh"
 # ZSH_THEME="awesomepanda"
 ZSH_THEME="sorins2"
 
-RPROMPT='$(tf_prompt_info)'
-ZSH_THEME_TF_PROMPT_PREFIX=""
-ZSH_THEME_TF_PROMPT_SUFFIX=""
-
-# RPROMPT='$(tf_prompt_info)'
-# ZSH_THEME_TF_PROMPT_PREFIX="%{$fg_bold[yellow]%}"
-# ZSH_THEME_TF_PROMPT_SUFFIX="%{$reset_color%}"
-
-
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
 # a theme from this variable instead of looking in $ZSH/themes/
@@ -115,11 +106,6 @@ if type brew &>/dev/null; then
 fi
 
 source $ZSH/oh-my-zsh.sh
-
-# Starship prompt
-# ===============
-# Initialize Starship AFTER Oh My Zsh to ensure proper hook integration
-eval "$(starship init zsh)"
 
 # User configuration
 
