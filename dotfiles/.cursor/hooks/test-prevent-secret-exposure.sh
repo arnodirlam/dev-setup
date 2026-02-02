@@ -112,7 +112,10 @@ assert_permission() {
     fi
 
     # Compare permission
+    # Workaround: Cursor 2.4.21+ ignores "ask" - when expected is "ask", accept "deny" as pass
     if [ "$actual" = "$expected" ]; then
+        handle_pass
+    elif [ "$expected" = "ask" ] && [ "$actual" = "deny" ]; then
         handle_pass
     else
         local user_msg

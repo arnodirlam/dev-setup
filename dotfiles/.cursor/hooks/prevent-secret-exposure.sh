@@ -110,8 +110,10 @@ respond_ask() {
   local user_msg="⚠️ $msg"
 
   # Use jq to properly encode JSON
+  # Workaround: Cursor 2.4.21+ ignores "ask" - output "deny" until Cursor fixes the bug
+  # See: https://forum.cursor.com/t/hooks-ask-permission-broken-in-2-4-21/150020
   jq -n \
-    --arg permission "ask" \
+    --arg permission "deny" \
     --arg userMessage "$user_msg" \
     --arg agentMessage "$agent_msg" \
     '{permission: $permission, userMessage: $userMessage, agentMessage: $agentMessage}'
