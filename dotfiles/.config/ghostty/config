@@ -19,6 +19,10 @@ window-inherit-working-directory = false
 tab-inherit-working-directory = false
 split-inherit-working-directory = true
 
+# install tip/nightly version via homebrew, then wait for next stable version
+auto-update-channel = stable
+auto-update = check
+
 macos-window-buttons = hidden
 macos-titlebar-style = tabs
 
@@ -27,6 +31,8 @@ macos-icon = custom-style
 macos-icon-ghost-color = #eeeeee
 macos-icon-screen-color = #000000
 macos-icon-frame = plastic
+
+notify-on-command-finish = unfocused
 
 keybind = cmd+d=new_split:down
 keybind = cmd+shift+d=new_split:right
