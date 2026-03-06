@@ -1,3 +1,2 @@
-eval "$(/opt/homebrew/bin/brew shellenv)"
-eval "$(/opt/homebrew/bin/mise activate zsh)"
-eval "$(/opt/homebrew/bin/direnv hook zsh)"
+# Environment initialization for Homebrew, mise, and direnv
+# is handled in ~/.zprofile to ensure correct PATH ordering.
