@@ -1,6 +1,12 @@
 {
   "version": 1,
   "hooks": {
+    "preToolUse": [
+      {
+        "command": "~/.cursor/hooks/inject-shell-bootstrap.sh",
+        "matcher": "Shell"
+      }
+    ],
     "beforeShellExecution": [
       {
         "command": "~/.cursor/hooks/prevent-secret-exposure.sh"
