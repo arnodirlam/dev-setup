@@ -1,0 +1,30 @@
+#:schema https://raw.githubusercontent.com/openai/codex/rust-v0.117.0/codex-rs/core/config.schema.json
+# NOTE: Update the schema tag to the newest GitHub release before editing this file.
+
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+personality = "friendly"
+approval_policy = "on-request"
+approvals_reviewer = "guardian_subagent"
+sandbox_mode = "workspace-write"
+
+[mcp_servers.context7]
+args = ["--bun", "@upstash/context7-mcp"]
+command = "bunx"
+enabled = true
+
+[features]
+multi_agent = true
+undo = true
+guardian_approval = true
+prevent_idle_sleep = true
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = [
+  "/Users/arno/.cache/nix",
+  "/Users/arno/.cache/zig",
+  "/Users/arno/.dev-browser",
+  "/Users/arno/.npm",
+  "/Users/arno/.ollama",
+]
