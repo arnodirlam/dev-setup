@@ -185,12 +185,11 @@ alias zshconfig="vim ~/.zshrc && source ~/.zshrc"
 alias ohmyzsh="vim ~/.oh-my-zsh"
 alias reload="exec $SHELL -l"
 function up() {
-  omz update
+  ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh"
   brew update
   brew upgrade
   brew cleanup
   brew doctor
-  xattr -d com.apple.quarantine /opt/homebrew/bin/chromedriver
   mise upgrade --cd ~/dev --yes
 }
 
@@ -220,6 +219,8 @@ function asdfre() {
 # Enable Elixir iex history
 export ERL_AFLAGS="-kernel shell_history enabled"
 
+# Elixir OS deps compilation parallelism (half of CPU cores)
+export MIX_OS_DEPS_COMPILE_PARTITION_COUNT=$(( $(sysctl -n hw.ncpu) / 2 ))
 
 # Elixir
 # ======
@@ -279,12 +280,9 @@ export LDFLAGS="-L$(brew --prefix unixodbc)/lib"
 # ======
 alias dblx64="docker buildx build --platform linux/amd64"
 
-# Go
-# ==
-export GOPATH=$HOME/go
-export GOROOT="$(brew --prefix golang)/libexec"
-export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
+# Android
+# =======
+export ANDROID_HOME=$HOME/Library/Android/sdk
 
 # imagemaguick@6
 # export PATH="$PATH:/opt/homebrew/opt/imagemagick@6/bin"
-
