@@ -491,13 +491,17 @@ brew-apply $doit="false": && (_show-dry-run-message doit)
 
     echo -e "{{ BLUE }}${log_prefix}🍺 Applying changes from Brewfile...{{ NORMAL }}"
 
-    # Install from Brewfile
+    # Uninstall first, then install from Brewfile
     if [[ "$doit" == "true" ]]; then
-        brew bundle --cleanup --file="{{ brewfile_path }}" | grep -v '^Using '
-    else
-        brew bundle check --no-upgrade --verbose --file="{{ brewfile_path }}" 2>&1 | grep -v -i 'satisfy.*dependencies' && echo "No packages to install." || true
+        brew bundle cleanup --force --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
         echo
+        brew bundle --file="{{ brewfile_path }}" | grep -v '^Using '
+        echo
+        brew cleanup
+    else
         brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
+        echo
+        brew bundle check --no-upgrade --verbose --file="{{ brewfile_path }}" 2>&1 | grep -v -i 'satisfy.*dependencies' && echo "No packages to install." || true
         echo
     fi
 
