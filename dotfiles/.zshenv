@@ -8,6 +8,8 @@ if command -v mise >/dev/null 2>&1; then
   eval "$(mise activate zsh)"
 fi
 
-if command -v direnv >/dev/null 2>&1; then
-  eval "$(direnv export zsh 2>/dev/null)" || true
+if [[ ! -o interactive ]]; then
+  if command -v direnv >/dev/null 2>&1; then
+    eval "$(direnv export zsh 2>/dev/null)" || true
+  fi
 fi
