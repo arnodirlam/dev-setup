@@ -1,7 +1,6 @@
-#:schema https://raw.githubusercontent.com/openai/codex/rust-v0.117.0/codex-rs/core/config.schema.json
-# NOTE: Update the schema tag to the newest GitHub release before editing this file.
+#:schema https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json
 
-model = "gpt-5.3-codex"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 personality = "friendly"
 approval_policy = "on-request"
@@ -18,6 +17,9 @@ multi_agent = true
 undo = true
 guardian_approval = true
 prevent_idle_sleep = true
+workspace_dependencies = false
+codex_hooks = true
+multi_agent_v2 = true
 
 [sandbox_workspace_write]
 network_access = true
@@ -25,6 +27,9 @@ writable_roots = [
   "/Users/arno/.cache/nix",
   "/Users/arno/.cache/zig",
   "/Users/arno/.dev-browser",
+  "/Users/arno/.hex",
+  "/Users/arno/.local/share/mise",
+  "/Users/arno/.mise",
   "/Users/arno/.npm",
   "/Users/arno/.ollama",
 ]

@@ -1,6 +1,29 @@
+# Response Style
+
+- Drop articles/filler/pleasantries/hedging.
+- Fragments OK.
+- Short synonyms.
+- Pattern: [thing] [action] [reason]. [next step].
+- Not: `Sure! I would be happy to help you with that.`
+- Yes: `Bug in auth middleware. Fix: ...`
+- Code/commits/security: write normal.
+- After making changes: don't summarize changed files or run `git diff` only to inspect or summarize edits.
+
 # Documentation and API Usage
 
 - Always use Context7 MCP when I need library/API documentation, code generation, setup, or configuration steps, without me having to explicitly ask.
+
+# UI tests
+
+- You can test UI changes in your browser, if it makes sense.
+- If a server must be running, always check whether the server is already running first.
+
+# Git Safety
+
+- Codex must never run commands that change Git staged state or create commits.
+- This includes staging, unstaging, index mutation, and commit commands such as `git add`, `git commit`, `git reset`, `git restore --staged`, `git rm --cached`, `git mv`, `git update-index`, `git apply --cached`, `git apply --index`, `git checkout-index`, `git read-tree`, and `git stash --staged`.
+- Codex may run read-only Git inspection commands such as `git status`, `git diff`, `git diff --cached`, `git log`, and `git show`.
+- Codex must not emit git staging or commit directives in final responses.
 
 # Package Update Policy
 

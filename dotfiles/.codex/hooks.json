@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -lc 'payload=$(cat); command=$(printf \"%s\" \"$payload\" | jq -r '\\''(.toolInput.command // .tool_input.command // .command // (try (.toolArgs | fromjson | .command) catch empty) // (try (.tool_args | fromjson | .command) catch empty) // .toolArgs.command // .tool_args.command // empty)'\\''); if printf \"%s\\n\" \"$command\" | grep -Eq '\\''(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*(add|commit|reset|rm|mv|update-index|checkout-index|read-tree)([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*restore([^;&|]*[[:space:]])--staged([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*apply([^;&|]*[[:space:]])--(cached|index)([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*stash([^;&|]*[[:space:]])--staged([[:space:]]|$)'\\''; then echo \"Blocked: Codex may not change Git staged state or create commits.\" >&2; exit 2; fi'",
+            "timeout": 5,
+            "statusMessage": "Checking Git index safety"
+          }
+        ]
+      }
+    ]
+  }
+}
