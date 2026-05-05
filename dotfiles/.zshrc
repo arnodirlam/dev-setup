@@ -92,6 +92,7 @@ plugins=(
   terraform
   fzf-tab
   zsh-autosuggestions
+  tab-start
   zsh-syntax-highlighting
 )
 
@@ -184,8 +185,48 @@ ZSH_THEME_TERM_TITLE_IDLE="%~"
 alias zshconfig="vim ~/.zshrc && source ~/.zshrc"
 alias ohmyzsh="vim ~/.oh-my-zsh"
 alias reload="exec $SHELL -l"
+alias ccusage="bunx @ccusage/codex@latest"
+
+# Type `h CMD ...` for automatic help via `CMD help ...`, `CMD ... --help`, or `man CMD`
+function h() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: h <command> [args...]" >&2
+    return 1
+  fi
+
+  if man "$1" 2>/dev/null; then
+    return 0
+  fi
+
+  local tmp
+  local rc
+  local -a help_cmd
+  tmp="$(mktemp -t h-help.XXXXXX)" || return 1
+
+  help_cmd=("$1" help "${@:2}")
+  if "${help_cmd[@]}" </dev/null >"$tmp" 2>&1 && [[ -s "$tmp" ]]; then
+    LESS= less -R -c +g -- "$tmp"
+    rc=$?
+    rm -f "$tmp"
+    return $rc
+  fi
+
+  if "$@" --help </dev/null >"$tmp" 2>&1 && [[ -s "$tmp" ]]; then
+    LESS= less -R -c +g -- "$tmp"
+    rc=$?
+    rm -f "$tmp"
+    return $rc
+  fi
+
+  LESS= less -R -c +g -- "$tmp"
+  rc=$?
+  rm -f "$tmp"
+  return $rc
+}
+
 function up() {
-  ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh"
+  # `-i` keeps upgrade.sh interactive so it prints the OMZ changelog.
+  ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i
   brew update
   brew upgrade
   brew cleanup
@@ -205,16 +246,16 @@ alias grevn='git revert --no-commit'
 alias grsm="git restore --source \$(git merge-base HEAD main)"
 alias gundo='git reset --soft HEAD~1'
 
+# just
+alias jc='just check'
+alias jf='just format'
+alias jl='just lint'
+alias js='just setup'
+
 # AWS & Terraform
 alias awswmi='aws sts get-caller-identity'
 alias tfw='tf workspace select'
 alias tfaa='terraform apply -auto-approve'
-
-# asdf
-function asdfre() {
-  asdf uninstall $@
-  asdf install $@
-}
 
 # Enable Elixir iex history
 export ERL_AFLAGS="-kernel shell_history enabled"
