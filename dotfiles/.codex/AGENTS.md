@@ -7,7 +7,8 @@
 - Not: `Sure! I would be happy to help you with that.`
 - Yes: `Bug in auth middleware. Fix: ...`
 - Code/commits/security: write normal.
-- After making changes: don't summarize changed files or run `git diff` only to inspect or summarize edits.
+- When asked a question: write normal, don't work.
+- Omit final summary of changed files.
 
 # Documentation and API Usage
 
@@ -20,25 +21,54 @@
 
 # Git Safety
 
-- Codex must never run commands that change Git staged state or create commits.
-- This includes staging, unstaging, index mutation, and commit commands such as `git add`, `git commit`, `git reset`, `git restore --staged`, `git rm --cached`, `git mv`, `git update-index`, `git apply --cached`, `git apply --index`, `git checkout-index`, `git read-tree`, and `git stash --staged`.
-- Codex may run read-only Git inspection commands such as `git status`, `git diff`, `git diff --cached`, `git log`, and `git show`.
-- Codex must not emit git staging or commit directives in final responses.
+- don't do any actions that change the index, unless explicitly asked to
+- even when asked to 'change staged files', read staged changes but don't update index by default
+- when any staged files are in the way, offer to make a commit when on a feature branch, or to stash staged files
+
+# Tool usage
+
+- Whenever you'd need a cli/mcp tool installed in order to complete a task in a much simpler/better way, ask the user to install it - preferably via homebrew or mise
 
 # Package Update Policy
 
-- Always keep a project-local `.tool-versions` file with pinned mise-managed versions for every tool used by the project, including local scripts, `just` tasks, CI workflows, and automation.
+- Keep a project-local `.tool-versions` file to be installed via `mise`
+  - this can also have `gem:RUBYGEM` or `npm:PACKAGE` package versions
 - Generally do not rely on system-installed tools; only use baseline utilities such as `bash`, `curl`, `jq`, and similar ubiquitous shell tools unless explicitly required.
-- In GitHub workflows, generally install pinned tools via `mise` using `jdx/mise-action@v4`:
+- Use `mise ls-remote TOOLNAME` to list available versions.
+- In GitHub workflows, generally install pinned tools via `mise` using `jdx/mise-action`:
 ```yaml
     - name: Setup tools
-      uses: jdx/mise-action@v4
+      uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
 ```
-- Always run `mise install` whenever `.tool-versions` changes.
-- When updating a tool, run `mise ls-remote TOOLNAME` first to review available versions.
-- Prefer small version steps when updating tools or language-specific packages to keep compatibility and the process predictable.
-- If the newest available version ends in `.0`, treat it as potentially unstable and ask the user whether to use that version or the previous version.
-- When updating a tool or language-specific package, check other common version pin locations too, including version/lock files and infra/automation files such as `Dockerfile` and `Justfile`.
+- Pin external GitHub Actions to full commit SHA, not tags like `@v4` or branches like `@main`.
+- Prefer small version steps when updating tools or packages to keep compatibility and the process predictable.
+- If a tool or package had many minor and tiny version updates in the past, and the newest available version ends in `.0`, treat it as potentially unstable and ask the user whether to use that version or the previous version.
+- When updating tools, packages or GitHub actions, read upstream changelog first; if missing, read GitHub Releases.
+- When updating a tool or package, check other common version pin locations too, such as version/lock files and infra/automation files such as `Dockerfile` and `Justfile`.
+
+# Justfile
+
+- Keep a project-local `Justfile` for reusable scripts
+- Run `just --list` before working to know what recipes are available
+- The first recipe should be:
+  ```
+  _default:
+    @just --list
+  ```
+- Simple checks for existing commands, files, directories etc. should be private one-line recipes
+  ```
+  _cmd cmd:
+    @command -v "{{cmd}}" >/dev/null || { echo "Missing command: {{cmd}}" >&2; exit 1; }
+  ```
+  used as dependencies for other recipes, e.g.
+  ```
+  setup: (_cmd "bun")
+    @bun install
+  ```
+- No need to check for commands defined in `.tool-versions`
+- Some canonical recipes: `check` for all checks, `start` for local development, `format`, `setup`
+  - these can have more specific recipes as dependencies, e.g. `test`, `setup-backend`, ...
+- CI steps should use these recipes, not have their own scripts
 
 # Secret Safety (Hard Deny by Default)
 
