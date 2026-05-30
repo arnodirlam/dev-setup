@@ -1,0 +1,628 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+set positional-arguments
+
+_default:
+  @just --list
+
+_cmd cmd:
+  @command -v "{{cmd}}" >/dev/null || { echo "Missing command: {{cmd}}" >&2; exit 1; }
+
+[no-cd]
+_file path:
+  @test -f "{{path}}" || { echo "Input missing: {{path}}" >&2; exit 1; }
+
+[no-cd]
+_pdf-file path: (_file path)
+  @case "{{path}}" in *.pdf|*.PDF) ;; *) echo "Input is not a PDF: {{path}}" >&2; exit 1 ;; esac
+
+# Regenerate one PDF as PDF 1.4 beside input, always appending -simple.
+[no-cd]
+simple-pdf input: (_cmd "gs") (_cmd "qpdf") (_pdf-file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  in="{{input}}"
+
+  dir="$(dirname "$in")"
+  base="$(basename "$in")"
+
+  ascii_base="$base"
+  ascii_base="${ascii_base//Ä/Ae}"
+  ascii_base="${ascii_base//Ö/Oe}"
+  ascii_base="${ascii_base//Ü/Ue}"
+  ascii_base="${ascii_base//ä/ae}"
+  ascii_base="${ascii_base//ö/oe}"
+  ascii_base="${ascii_base//ü/ue}"
+  ascii_base="${ascii_base//ß/ss}"
+  ascii_base="$({ printf '%s' "$ascii_base" | iconv -c -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null || true; } | tr -cd '\11\12\15\40-\176')"
+  case "$ascii_base" in
+    *.pdf|*.PDF) ascii_base="${ascii_base%.*}" ;;
+  esac
+
+  out="$dir/${ascii_base}-simple.pdf"
+
+  echo "Writing: $out"
+
+  gs \
+    -dSAFER \
+    -dNOPAUSE \
+    -dBATCH \
+    -sDEVICE=pdfwrite \
+    -dCompatibilityLevel=1.4 \
+    -dPDFSETTINGS=/prepress \
+    -dEmbedAllFonts=true \
+    -dSubsetFonts=true \
+    -dCompressFonts=true \
+    -dDetectDuplicateImages=true \
+    -sOutputFile="$out" \
+    "$in"
+
+  qpdf --check "$out"
+  pages="$(qpdf --show-npages "$out")"
+  echo "OK: $pages pages"
+
+# Regenerate multiple PDFs as PDF 1.4 beside each input.
+[no-cd]
+simple-pdfs +inputs:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  for input in "$@"; do
+    just -g simple-pdf "$input"
+  done
+
+# Slice PDF pages into a new file appending -sliced; range examples: 1-3, 1,3,5, z-1.
+[no-cd]
+slice-pdf input range: (_cmd "qpdf") (_pdf-file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+  range="$2"
+
+  dir="$(dirname "$input")"
+  base="$(basename "$input")"
+  stem="$base"
+  case "$stem" in
+    *.pdf|*.PDF) stem="${stem%.*}" ;;
+  esac
+  out="$dir/${stem}-sliced.pdf"
+
+  echo "Writing: $out"
+
+  qpdf --empty --pages "$input" "$range" -- "$out"
+
+  qpdf --check "$out"
+  pages="$(qpdf --show-npages "$out")"
+  echo "OK: $pages pages"
+
+# Concatenate input PDFs into out.pdf beside the first PDF.
+[no-cd]
+concat-pdfs +inputs: (_cmd "qpdf")
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  first="$1"
+
+  for input in "$@"; do
+    just -g _pdf-file "$input"
+  done
+
+  out="$(dirname "$first")/out.pdf"
+  tmp="$out.tmp.$$.pdf"
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  qpdf --warning-exit-0 --empty --pages "$@" -- "$tmp"
+  qpdf --warning-exit-0 --check "$tmp"
+  pages="$(qpdf --show-npages "$tmp")"
+  mv "$tmp" "$out"
+  trap - EXIT
+  echo "OK: $pages pages"
+
+# Compress PDFs beside inputs, appending -compressed; set PDF_COMPRESS_QUALITY=screen|ebook|printer|prepress|default.
+[no-cd]
+compress-pdfs +inputs: (_cmd "gs") (_cmd "qpdf")
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  quality="${PDF_COMPRESS_QUALITY:-ebook}"
+  case "$quality" in
+    screen|ebook|printer|prepress|default) ;;
+    *)
+      echo "Invalid PDF_COMPRESS_QUALITY: $quality" >&2
+      echo "Expected one of: screen, ebook, printer, prepress, default" >&2
+      exit 1
+      ;;
+  esac
+
+  for input in "$@"; do
+    just -g _pdf-file "$input"
+
+    dir="$(dirname "$input")"
+    base="$(basename "$input")"
+    stem="$base"
+    case "$stem" in
+      *.pdf|*.PDF) stem="${stem%.*}" ;;
+    esac
+    out="$dir/${stem}-compressed.pdf"
+
+    echo "Writing: $out"
+
+    gs \
+      -dSAFER \
+      -dNOPAUSE \
+      -dBATCH \
+      -sDEVICE=pdfwrite \
+      -dCompatibilityLevel=1.4 \
+      -dPDFSETTINGS="/$quality" \
+      -dDetectDuplicateImages=true \
+      -dCompressFonts=true \
+      -sOutputFile="$out" \
+      "$input"
+
+    qpdf --check "$out"
+    pages="$(qpdf --show-npages "$out")"
+    bytes="$(wc -c < "$out" | tr -d ' ')"
+    echo "OK: $pages pages, $bytes bytes"
+  done
+
+# OCR PDFs beside inputs, appending -ocr; set PDF_LANG=deu+eng.
+[no-cd]
+ocr-pdfs +inputs: (_cmd "ocrmypdf") (_cmd "qpdf") (_cmd "tesseract")
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  lang="${PDF_LANG:-deu+eng}"
+
+  available_langs="$(tesseract --list-langs 2>/dev/null | tail -n +2)"
+  IFS='+' read -ra requested_langs <<< "$lang"
+  for requested_lang in "${requested_langs[@]}"; do
+    if ! grep -Fxq "$requested_lang" <<< "$available_langs"; then
+      echo "Missing Tesseract language data: $requested_lang" >&2
+      echo "Install Homebrew formula: tesseract-lang" >&2
+      exit 1
+    fi
+  done
+
+  for input in "$@"; do
+    just -g _pdf-file "$input"
+
+    dir="$(dirname "$input")"
+    base="$(basename "$input")"
+    stem="$base"
+    case "$stem" in
+      *.pdf|*.PDF) stem="${stem%.*}" ;;
+    esac
+    out="$dir/${stem}-ocr.pdf"
+
+    echo "Writing: $out"
+
+    ocrmypdf \
+      --language "$lang" \
+      --skip-text \
+      --deskew \
+      --rotate-pages \
+      --optimize 3 \
+      --output-type pdf \
+      "$input" \
+      "$out"
+
+    qpdf --check "$out"
+    pages="$(qpdf --show-npages "$out")"
+    echo "OK: $pages pages"
+  done
+
+# Extract one PDF to Markdown on stdout, using native text first and OCR only where needed.
+[no-cd]
+pdf-to-md input: (_cmd "uv") (_pdf-file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+  ocr_lang="${PDF_LANG:-deu+eng}"
+  ocr_dpi="${PDF_DPI:-800}"
+
+  if [[ ! "$ocr_dpi" =~ ^[0-9]+$ ]]; then
+    echo "Invalid PDF_DPI: $ocr_dpi" >&2
+    exit 1
+  fi
+
+  uv run \
+    --quiet \
+    --python 3.13 \
+    --with pymupdf4llm==1.27.2.3 \
+    python - "$input" "$ocr_lang" "$ocr_dpi" <<'PY'
+  import contextlib
+  import os
+  import shutil
+  import subprocess
+  import sys
+  import unicodedata
+
+  import pymupdf
+  import pymupdf4llm
+
+  input_path = sys.argv[1]
+  ocr_language = sys.argv[2]
+  ocr_dpi = int(sys.argv[3])
+
+  def native_text_is_usable(text):
+      visible = [char for char in text if not char.isspace()]
+      if not visible:
+          return False
+      alnum = sum(char.isalnum() for char in visible)
+      bad = sum(
+          char == "\ufffd" or unicodedata.category(char).startswith("C")
+          for char in visible
+      )
+      return alnum > 0 and bad / len(visible) <= 0.1
+
+  def clean_markdown(text):
+      return "".join(
+          char
+          for char in text
+          if char in "\n\t" or not unicodedata.category(char).startswith("C")
+      )
+
+  def page_links(doc, page_index):
+      seen = set()
+      links = []
+      for link in doc[page_index].get_links():
+          uri = link.get("uri")
+          if not uri or uri in seen:
+              continue
+          seen.add(uri)
+          links.append(uri)
+      return links
+
+  def markdown_autolink(uri):
+      return "<" + uri.replace("<", "%3C").replace(">", "%3E") + ">"
+
+  def page_ranges(pages):
+      if not pages:
+          return "none"
+      ranges = []
+      start = end = pages[0] + 1
+      for page_index in pages[1:]:
+          page = page_index + 1
+          if page == end + 1:
+              end = page
+              continue
+          ranges.append(str(start) if start == end else f"{start}-{end}")
+          start = end = page
+      ranges.append(str(start) if start == end else f"{start}-{end}")
+      return ",".join(ranges)
+
+  def validate_ocr():
+      if shutil.which("tesseract") is None:
+          raise SystemExit("Missing command: tesseract")
+      result = subprocess.run(
+          ["tesseract", "--list-langs"],
+          check=True,
+          capture_output=True,
+          text=True,
+      )
+      available_langs = set(result.stdout.splitlines()[1:])
+      for requested_lang in ocr_language.split("+"):
+          if requested_lang not in available_langs:
+              raise SystemExit(
+                  f"Missing Tesseract language data: {requested_lang}\n"
+                  "Install Homebrew formula: tesseract-lang"
+              )
+
+  @contextlib.contextmanager
+  def redirect_stdout_fd_to_stderr():
+      sys.stdout.flush()
+      saved_stdout = os.dup(1)
+      try:
+          os.dup2(2, 1)
+          yield
+      finally:
+          sys.stdout.flush()
+          os.dup2(saved_stdout, 1)
+          os.close(saved_stdout)
+
+  def markdown_chunks(doc, pages, *, force_ocr):
+      if not pages:
+          return {}
+      kwargs = {
+          "pages": pages,
+          "page_chunks": True,
+          "force_ocr": force_ocr,
+          "use_ocr": force_ocr,
+      }
+      if force_ocr:
+          kwargs.update(
+              {
+                  "ocr_language": ocr_language,
+                  "ocr_dpi": ocr_dpi,
+              }
+          )
+      with redirect_stdout_fd_to_stderr():
+          chunks = pymupdf4llm.to_markdown(doc, **kwargs)
+      return {
+          page_index: clean_markdown(chunk.get("text") or "").strip()
+          for page_index, chunk in zip(pages, chunks)
+      }
+
+  with pymupdf.open(input_path) as doc:
+      native_text = {
+          page.number: page.get_text("text", sort=True).strip()
+          for page in doc
+      }
+      native_pages = [
+          page_index
+          for page_index, text in native_text.items()
+          if native_text_is_usable(text)
+      ]
+      ocr_pages = [
+          page_index
+          for page_index in range(doc.page_count)
+          if page_index not in native_pages
+      ]
+
+      if ocr_pages:
+          validate_ocr()
+
+      print(
+          f"Pages: {doc.page_count}; native: {page_ranges(native_pages)}; "
+          f"ocr: {page_ranges(ocr_pages)}",
+          file=sys.stderr,
+      )
+
+      markdown = markdown_chunks(doc, native_pages, force_ocr=False)
+      markdown.update(markdown_chunks(doc, ocr_pages, force_ocr=True))
+
+      parts = []
+      for page_index in range(doc.page_count):
+          page = page_index + 1
+          text = markdown.get(page_index) or clean_markdown(native_text[page_index])
+          links = page_links(doc, page_index)
+          if links:
+              bullets = "\n".join(f"- {markdown_autolink(uri)}" for uri in links)
+              text = f"{text}\n\nLinks:\n{bullets}" if text else f"Links:\n{bullets}"
+          parts.append(f"<!-- page: {page} of {doc.page_count} -->\n\n{text}".rstrip())
+
+  print("\n\n".join(parts).rstrip())
+  PY
+
+# Extract one PDF to a sibling Markdown file using pdf-to-md.
+[no-cd]
+pdf-to-md-file input: (_pdf-file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+
+  dir="$(dirname "$input")"
+  base="$(basename "$input")"
+  stem="$base"
+  case "$stem" in
+    *.pdf|*.PDF) stem="${stem%.*}" ;;
+  esac
+  out="$dir/${stem}.md"
+  tmp="$out.tmp.$$"
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  just -g pdf-to-md "$input" > "$tmp"
+  mv "$tmp" "$out"
+  trap - EXIT
+
+# Add or replace a Markdown H2 section with command output.
+[no-cd]
+md-command-section markdown_file +command: (_file markdown_file)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  markdown_file="$1"
+  shift
+
+  command_title="$(printf '%q ' "$@")"
+  command_title="${command_title% }"
+  heading="## \`$command_title\`"
+  tmp_output="$markdown_file.output.$$"
+  tmp_section="$markdown_file.section.$$"
+  tmp_file="$markdown_file.tmp.$$"
+
+  trap 'rm -f "$tmp_output" "$tmp_section" "$tmp_file"' EXIT
+
+  "$@" > "$tmp_output" 2>&1
+
+  {
+    printf '%s\n\n' "$heading"
+    printf '```text\n'
+    cat "$tmp_output"
+    if [[ -s "$tmp_output" ]] && [[ "$(tail -c 1 "$tmp_output" | od -An -t x1 | tr -d ' \n')" != "0a" ]]; then
+      printf '\n'
+    fi
+    printf '```\n'
+  } > "$tmp_section"
+
+  awk -v heading="$heading" -v section="$tmp_section" '
+    function emit_section() {
+      while ((getline line < section) > 0) {
+        print line
+      }
+      close(section)
+    }
+
+    $0 == heading {
+      if (!replaced) {
+        emit_section()
+        replaced = 1
+      }
+      skipping = 1
+      next
+    }
+
+    skipping && /^## / {
+      skipping = 0
+    }
+
+    skipping {
+      next
+    }
+
+    {
+      print
+    }
+
+    END {
+      if (!replaced) {
+        if (NR > 0) {
+          print ""
+        }
+        emit_section()
+      }
+    }
+  ' "$markdown_file" > "$tmp_file"
+
+  mv "$tmp_file" "$markdown_file"
+  rm -f "$tmp_output" "$tmp_section"
+  trap - EXIT
+
+# OCR one image to a sibling Markdown/text file; set IMAGE_LANG=deu+eng and IMAGE_OCR_EXT=md|txt.
+[no-cd]
+image-to-text-file input: (_cmd "tesseract") (_file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+  lang="${IMAGE_LANG:-${PDF_LANG:-deu+eng}}"
+  ext="${IMAGE_OCR_EXT:-md}"
+
+  case "$ext" in
+    md|txt) ;;
+    *)
+      echo "Invalid IMAGE_OCR_EXT: $ext" >&2
+      echo "Expected one of: md, txt" >&2
+      exit 1
+      ;;
+  esac
+
+  available_langs="$(tesseract --list-langs 2>/dev/null | tail -n +2)"
+  IFS='+' read -ra requested_langs <<< "$lang"
+  for requested_lang in "${requested_langs[@]}"; do
+    if ! grep -Fxq "$requested_lang" <<< "$available_langs"; then
+      echo "Missing Tesseract language data: $requested_lang" >&2
+      echo "Install Homebrew formula: tesseract-lang" >&2
+      exit 1
+    fi
+  done
+
+  dir="$(dirname "$input")"
+  base="$(basename "$input")"
+  stem="$base"
+  case "$stem" in
+    *.*) stem="${stem%.*}" ;;
+  esac
+  out="$dir/${stem}.${ext}"
+  tmp="$out.tmp.$$"
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  tesseract "$input" stdout --psm 6 -l "$lang" > "$tmp"
+  mv "$tmp" "$out"
+  trap - EXIT
+
+# OCR one image to a sibling hOCR HTML file; set IMAGE_LANG=deu+eng.
+[no-cd]
+image-to-html-file input: (_cmd "tesseract") (_file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+  lang="${IMAGE_LANG:-${PDF_LANG:-deu+eng}}"
+
+  available_langs="$(tesseract --list-langs 2>/dev/null | tail -n +2)"
+  IFS='+' read -ra requested_langs <<< "$lang"
+  for requested_lang in "${requested_langs[@]}"; do
+    if ! grep -Fxq "$requested_lang" <<< "$available_langs"; then
+      echo "Missing Tesseract language data: $requested_lang" >&2
+      echo "Install Homebrew formula: tesseract-lang" >&2
+      exit 1
+    fi
+  done
+
+  dir="$(dirname "$input")"
+  base="$(basename "$input")"
+  stem="$base"
+  case "$stem" in
+    *.*) stem="${stem%.*}" ;;
+  esac
+  out="$dir/${stem}.html"
+  tmp="$out.tmp.$$"
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  tesseract "$input" stdout --psm 6 -l "$lang" hocr > "$tmp"
+  mv "$tmp" "$out"
+  trap - EXIT
+
+# Make the background of one image transparent using the top-left pixel; set IMAGE_TRANSPARENT_FUZZ=8%, IMAGE_TRANSPARENT_COLOR=white, or IMAGE_DESPECKLE_RADIUS=1.
+[no-cd]
+image-to-transparent-file input: (_cmd "magick") (_file input)
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  input="$1"
+  fuzz="${IMAGE_TRANSPARENT_FUZZ:-8%}"
+  despeckle_radius="${IMAGE_DESPECKLE_RADIUS:-1}"
+
+  dir="$(dirname "$input")"
+  base="$(basename "$input")"
+  stem="$base"
+  case "$stem" in
+    *.*) stem="${stem%.*}" ;;
+  esac
+  out="$dir/${stem}-transparent.png"
+  tmp="$out.tmp.$$.png"
+
+  background="${IMAGE_TRANSPARENT_COLOR:-}"
+  if [[ -z "$background" ]]; then
+    background="$(magick "$input" -format "%[pixel:p{0,0}]" info:)"
+  fi
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  if [[ "$despeckle_radius" == "0" ]]; then
+    magick "$input" \
+      -alpha set \
+      -fuzz "$fuzz" \
+      -transparent "$background" \
+      "$tmp"
+  else
+    magick "$input" \
+      -alpha set \
+      -fuzz "$fuzz" \
+      -transparent "$background" \
+      -channel A \
+      -morphology Open "Disk:$despeckle_radius" \
+      +channel \
+      "$tmp"
+  fi
+  mv "$tmp" "$out"
+  trap - EXIT
+
+# Concatenate input images into out.pdf beside the first image.
+[no-cd]
+images-to-pdf +inputs: (_cmd "magick")
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  first="$1"
+
+  for input in "$@"; do
+    just -g _file "$input"
+  done
+
+  out="$(dirname "$first")/out.pdf"
+  tmp="$out.tmp.$$.pdf"
+
+  trap 'rm -f "$tmp"' EXIT
+  echo "Writing: $out" >&2
+  magick "$@" "$tmp"
+  mv "$tmp" "$out"
+  trap - EXIT
