@@ -471,7 +471,9 @@ brew-dump $doit="false": && (_show-dry-run-message doit)
 
     echo -e "{{ BLUE }}${log_prefix}🍺 Generating Brewfile from installed packages...{{ NORMAL }}"
 
-    [[ "$doit" == "true" ]] && brew bundle dump --file="{{ brewfile_path }}" --force --no-vscode
+    # Brew Bundle treats an empty npm/cargo/uv section as "do not manage this type",
+    # not "remove all packages of this type"; exclude them from generated Brewfiles.
+    [[ "$doit" == "true" ]] && brew bundle dump --force --file="{{ brewfile_path }}" --no-vscode --no-cargo --no-uv --no-npm
     echo -e "{{ GREEN }}${log_prefix}✅ Brewfile generated from installed packages!{{ NORMAL }}"
 
 # Apply Brewfile, (un)installing packages, casks and taps as needed
@@ -493,13 +495,13 @@ brew-apply $doit="false": && (_show-dry-run-message doit)
 
     # Uninstall first, then install from Brewfile
     if [[ "$doit" == "true" ]]; then
-        brew bundle cleanup --force --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
+        brew bundle cleanup --force --file="{{ brewfile_path }}"
         echo
-        brew bundle --file="{{ brewfile_path }}" | grep -v '^Using '
+        brew bundle --no-upgrade --file="{{ brewfile_path }}" | grep -v '^Using '
         echo
         brew cleanup
     else
-        brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
+        printf 'n' | brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall."
         echo
         brew bundle check --no-upgrade --verbose --file="{{ brewfile_path }}" 2>&1 | grep -v -i 'satisfy.*dependencies' && echo "No packages to install." || true
         echo
@@ -548,9 +550,9 @@ brew-purge $doit="false": && (_show-dry-run-message doit)
 
     # Clean up packages not in Brewfile
     if [[ "$doit" == "true" ]]; then
-        brew bundle cleanup --force --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
+        brew bundle cleanup --force --file="{{ brewfile_path }}"
     else
-        brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
+        printf 'n' | brew bundle cleanup --file="{{ brewfile_path }}" && echo "No packages to uninstall." || true
     fi
 
 # List Elixir dependency package names used across stale projects in ~/dev
