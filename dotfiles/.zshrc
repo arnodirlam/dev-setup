@@ -187,41 +187,91 @@ alias ohmyzsh="vim ~/.oh-my-zsh"
 alias reload="exec $SHELL -l"
 alias ccusage="bunx @ccusage/codex@latest"
 
+function _h_run_with_tmp_pager() {
+  local tmp
+  local rc
+  tmp="$(mktemp -t h-help.XXXXXX)" || return 1
+
+  if "$@" </dev/null >"$tmp" 2>&1 && [[ -s "$tmp" ]]; then
+    LESS= less -R -c +g -- "$tmp"
+    rc=$?
+    rm -f "$tmp"
+    return $rc
+  fi
+
+  rm -f "$tmp"
+  return 1
+}
+
+function _h_usage() {
+  echo "Usage: h <command> [args...]" >&2
+}
+
 # Type `h CMD ...` for automatic help via `CMD help ...`, `CMD ... --help`, or `man CMD`
 function h() {
-  if [[ $# -eq 0 ]]; then
-    echo "Usage: h <command> [args...]" >&2
+  # `h --help` → `Usage: h <command> [args...]`
+  if [[ $# -eq 0 || ( $# -eq 1 && "$1" == "--help" ) ]]; then
+    _h_usage
+    return $(( $# == 0 ? 1 : 0 ))
+  fi
+
+  # `h g` → `git`
+  local original_command="$1"
+  local -a cmd
+  if (( $+aliases[$1] )); then
+    cmd=(${(z)aliases[$1]} "${@:2}")
+  else
+    cmd=("$@")
+  fi
+
+  # `h g` → errors mention `git (from alias g)`
+  local command_name="${cmd[1]}"
+  local display_command="$command_name"
+  if [[ "$original_command" != "$command_name" ]]; then
+    display_command="$command_name (from alias $original_command)"
+  fi
+
+  # `h typo` → `h: command not found: typo`
+  if ! whence -w -- "$command_name" >/dev/null 2>&1; then
+    echo "h: command not found: $display_command" >&2
     return 1
   fi
 
-  if man "$1" 2>/dev/null; then
+  # `h up` → no execution; `h mise install` → executable probes
+  if [[ -n "${functions[$command_name]}" ]] && ! whence -p -- "$command_name" >/dev/null 2>&1; then
+    # `h h` → `h --help`
+    if [[ "${functions[$command_name]}" == *"--help"* ]] && _h_run_with_tmp_pager "$command_name" --help; then
+      return 0
+    fi
+
+    echo "h: no help found for $display_command" >&2
+    return 1
+  fi
+
+  # `h git` → `man git`
+  if [[ $# -eq 1 ]] && man -w "$command_name" >/dev/null 2>&1 && man "$command_name"; then
     return 0
   fi
 
-  local tmp
-  local rc
+  # `h mise install` → `mise help install`
   local -a help_cmd
-  tmp="$(mktemp -t h-help.XXXXXX)" || return 1
-
-  help_cmd=("$1" help "${@:2}")
-  if "${help_cmd[@]}" </dev/null >"$tmp" 2>&1 && [[ -s "$tmp" ]]; then
-    LESS= less -R -c +g -- "$tmp"
-    rc=$?
-    rm -f "$tmp"
-    return $rc
+  help_cmd=("$command_name" help "${cmd[@]:1}")
+  if _h_run_with_tmp_pager "${help_cmd[@]}"; then
+    return 0
   fi
 
-  if "$@" --help </dev/null >"$tmp" 2>&1 && [[ -s "$tmp" ]]; then
-    LESS= less -R -c +g -- "$tmp"
-    rc=$?
-    rm -f "$tmp"
-    return $rc
+  # `h mise install` → `mise install --help`
+  if _h_run_with_tmp_pager "${cmd[@]}" --help; then
+    return 0
   fi
 
-  LESS= less -R -c +g -- "$tmp"
-  rc=$?
-  rm -f "$tmp"
-  return $rc
+  # `h git status` → `man git`
+  if man -w "$command_name" >/dev/null 2>&1 && man "$command_name"; then
+    return 0
+  fi
+
+  echo "h: no help found for $display_command" >&2
+  return 1
 }
 
 function up() {
