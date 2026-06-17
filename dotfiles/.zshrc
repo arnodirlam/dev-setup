@@ -173,8 +173,44 @@ export HOMEBREW_INSTALL_BADGE="✅"
 export HOMEBREW_NO_AUTO_UPDATE=true
 export HOMEBREW_NO_INSTALL_CLEANUP=true
 
-# hide user and hostname in terminal title
-ZSH_THEME_TERM_TITLE_IDLE="%~"
+# Terminal title
+# ==============
+function _term_title_dir {
+  if [[ "$PWD" == "$HOME/dev/"* ]]; then
+    REPLY="${PWD#$HOME/dev/}"
+  elif [[ "$PWD" == "$HOME" ]]; then
+    REPLY="~"
+  elif [[ "$PWD" == "$HOME/"* ]]; then
+    REPLY="~/${PWD#$HOME/}"
+  else
+    REPLY="$PWD"
+  fi
+}
+
+# title when idle: "~/..."
+function omz_termsupport_precmd {
+  [[ "${DISABLE_AUTO_TITLE:-}" != true ]] || return 0
+
+  _term_title_dir
+  title "${REPLY:gs/%/%%}"
+}
+
+# title when running a command: "~/... command"
+function omz_termsupport_preexec {
+  [[ "${DISABLE_AUTO_TITLE:-}" != true ]] || return 0
+
+  emulate -L zsh
+  setopt extended_glob
+
+  _term_title_dir
+
+  # cmd name only, or if this is sudo or ssh, the next cmd
+  local cmd="${2[(wr)^(*=*|sudo|ssh|mosh|rake|-*)]}"
+  local safe_cmd="${cmd:gs/%/%%}"
+  local safe_dir="${REPLY:gs/%/%%}"
+
+  title "$safe_dir $safe_cmd"
+}
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh

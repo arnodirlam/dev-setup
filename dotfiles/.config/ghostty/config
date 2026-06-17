@@ -33,6 +33,8 @@ auto-update = off
 macos-window-buttons = hidden
 macos-titlebar-style = tabs
 
+shell-integration-features = no-title
+
 # macos-icon = chalkboard
 macos-icon = custom-style
 macos-icon-ghost-color = #eeeeee
