@@ -1,0 +1,4 @@
+interface:
+  display_name: "Elixir Development"
+  short_description: "Idiomatic fail-fast Elixir development"
+  default_prompt: "Use $elixir-development to implement this change with idiomatic fail-fast Elixir conventions."

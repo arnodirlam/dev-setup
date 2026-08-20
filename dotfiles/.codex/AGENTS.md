@@ -45,6 +45,7 @@
 - If a tool or package had many minor and tiny version updates in the past, and the newest available version ends in `.0`, treat it as potentially unstable and ask the user whether to use that version or the previous version.
 - When updating tools, packages or GitHub actions, read upstream changelog first; if missing, read GitHub Releases.
 - When updating a tool or package, check other common version pin locations too, such as version/lock files and infra/automation files such as `Dockerfile` and `Justfile`.
+- Don't change version constraints unless required to update a version.
 
 # Justfile
 
@@ -69,6 +70,11 @@
 - Some canonical recipes: `check` for all checks, `start` for local development, `format`, `setup`
   - these can have more specific recipes as dependencies, e.g. `test`, `setup-backend`, ...
 - CI steps should use these recipes, not have their own scripts
+
+# Elixir
+
+- For Elixir work, apply the `$elixir-development` skill.
+- Default to fail-fast behavior inside trusted, supervised code; handle expected failures and external trust boundaries explicitly.
 
 # Secret Safety (Hard Deny by Default)
 
