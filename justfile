@@ -473,7 +473,20 @@ brew-dump $doit="false": && (_show-dry-run-message doit)
 
     # Brew Bundle treats an empty npm/cargo/uv section as "do not manage this type",
     # not "remove all packages of this type"; exclude them from generated Brewfiles.
-    [[ "$doit" == "true" ]] && brew bundle dump --force --file="{{ brewfile_path }}" --no-vscode --no-cargo --no-uv --no-npm
+    if [[ "$doit" == "true" ]]; then
+        brew bundle dump --force --file=- --no-vscode --no-cargo --no-uv --no-npm | \
+        awk '
+            /^# / { comment = $0; next }
+            comment && NF {
+                printf "%-28s %s\n", $0, comment
+                comment = ""
+                next
+            }
+            comment { print comment; comment = "" }
+            { print }
+            END { if (comment) print comment }
+        ' > "{{ brewfile_path }}"
+    fi
     echo -e "{{ GREEN }}${log_prefix}✅ Brewfile generated from installed packages!{{ NORMAL }}"
 
 # Apply Brewfile, (un)installing packages, casks and taps as needed
