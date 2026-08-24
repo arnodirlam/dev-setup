@@ -139,6 +139,7 @@ cask "slack"                 # Team communication and collaboration software
 cask "spotify"               # Music streaming service
 cask "stats"                 # System monitor for the menu bar
 cask "steam"                 # Video game digital distribution service
+cask "swiftbar"              # Menu bar customization tool
 cask "synology-drive"        # Sync and backup service to Synology NAS drives
 cask "teamviewer"            # Remote access and connectivity software focused on security
 cask "telegram"              # Messaging app with a focus on speed and security
