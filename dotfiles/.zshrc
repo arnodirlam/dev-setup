@@ -110,6 +110,11 @@ source $ZSH/oh-my-zsh.sh
 
 # User configuration
 
+# Accept next word with Right Arrow; accept full suggestion with Shift+Right Arrow.
+bindkey '^[[C' forward-word
+[[ -n "$terminfo[kcuf1]" ]] && bindkey "$terminfo[kcuf1]" forward-word
+bindkey '^[[1;2C' autosuggest-accept
+
 # fzf-tab configuration
 # ====================
 # Open in tmux popup if on tmux, otherwise use --height mode
@@ -131,6 +136,9 @@ zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'bat --style=numbers --color=always --line-range :500 $realpath 2>/dev/null || tree -C $realpath 2>/dev/null'
 # Preview file contents for common file-handling commands
 zstyle ':fzf-tab:complete:(cat|bat|less|vim|nvim|nano|emacs):*' fzf-preview 'bat --style=numbers --color=always --line-range :500 $realpath 2>/dev/null'
+# Preview Mix task documentation when completing the task name
+zstyle ':fzf-tab:complete:mix:argument-1' fzf-preview 'mix help "$word" 2>/dev/null'
+zstyle ':fzf-tab:complete:mix:argument-1' fzf-flags --preview-window=wrap,wrap-word,border-sharp
 
 # Custom preview function for fzf completions (** trigger)
 _fzf_comprun() {
@@ -314,7 +322,8 @@ function up() {
   # `-i` keeps upgrade.sh interactive so it prints the OMZ changelog.
   ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i
   brew update
-  brew upgrade
+  brew upgrade --formula
+  brew upgrade --cask
   brew cleanup
   brew doctor
   mise upgrade --cd ~/dev --yes
@@ -330,7 +339,30 @@ alias gprodl="git fetch --all && git log --left-right --graph --cherry-pick --pr
 alias gbase='git merge-base HEAD main'
 alias grevn='git revert --no-commit'
 alias grsm="git restore --source \$(git merge-base HEAD main)"
+
+# Soft-reset to the parent commit
 alias gundo='git reset --soft HEAD~1'
+
+# Soft-reset to the most recent child commit on this branch
+function gredo() {
+  local branch current child parent
+  branch="$(git symbolic-ref --quiet --short HEAD)" || {
+    echo "gredo: not on a branch" >&2
+    return 1
+  }
+  current="$(git rev-parse --verify HEAD)" || return 1
+
+  for child in ${(f)"$(git reflog --format=%H --no-abbrev "$branch")"}; do
+    parent="$(git rev-parse --verify --quiet "$child^1")" || continue
+    if [[ "$parent" == "$current" ]]; then
+      git reset --soft "$child"
+      return $?
+    fi
+  done
+
+  echo "gredo: no child commit found for $current on $branch" >&2
+  return 1
+}
 
 # just
 alias jc='just check'
