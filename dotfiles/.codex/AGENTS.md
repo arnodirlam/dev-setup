@@ -19,6 +19,13 @@
 - You can test UI changes in your browser, if it makes sense.
 - If a server must be running, always check whether the server is already running first.
 
+# Implementation Simplicity
+
+- Understand the affected flow before editing. Fix root causes at the narrowest shared layer; inspect affected callers.
+- Before adding code or dependencies, prefer existing project code, then the standard library, native platform features, and installed dependencies.
+- Do not add unrequested features, speculative abstractions, future scaffolding, or avoidable dependencies. Choose the smallest clear diff that fully meets the request.
+- Minimalism never overrides correctness, readability, edge cases, validation, error handling, security, accessibility, data-loss protection, or project test conventions.
+
 # Git Safety
 
 - don't do any actions that change the index, unless explicitly asked to
