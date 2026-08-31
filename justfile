@@ -130,7 +130,7 @@ create-dev-dir $doit="false": && (_show-dry-run-message doit)
     fi
 
 # Bootstrap the dev environment
-bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (link-all doit) (brew-apply doit) && (_show-dry-run-message doit)
+bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (brew-apply doit) (link-all doit) && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
