@@ -120,6 +120,66 @@ concat-pdfs +inputs: (_cmd "qpdf")
   trap - EXIT
   echo "OK: $pages pages"
 
+# Decrypt matching PDFs beside inputs, appending -decrypted; prompts once for the shared password.
+[no-cd]
+decrypt-pdfs +patterns: (_cmd "qpdf")
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  inputs=()
+  for pattern in "$@"; do
+    matches=()
+    if [[ -f "$pattern" ]]; then
+      matches+=("$pattern")
+    else
+      while IFS= read -r match; do
+        matches+=("$match")
+      done < <(compgen -G "$pattern" || true)
+    fi
+
+    if (( ${#matches[@]} == 0 )); then
+      echo "No files matched: $pattern" >&2
+      exit 1
+    fi
+    inputs+=("${matches[@]}")
+  done
+
+  for input in "${inputs[@]}"; do
+    just -g _pdf-file "$input"
+  done
+
+  unlock_file="$(mktemp "${TMPDIR:-/tmp}/decrypt-pdfs.XXXXXX")"
+  tmp=""
+  cleanup() {
+    [[ -z "$tmp" ]] || rm -f "$tmp"
+    rm -f "$unlock_file"
+  }
+  chmod 600 "$unlock_file"
+  trap cleanup EXIT
+
+  printf 'PDF password: ' >/dev/tty
+  IFS= read -r -s unlock_value </dev/tty
+  printf '\n' >/dev/tty
+  printf '%s\n' "$unlock_value" > "$unlock_file"
+  unset unlock_value
+
+  for input in "${inputs[@]}"; do
+    dir="$(dirname "$input")"
+    base="$(basename "$input")"
+    stem="${base%.*}"
+    out="$dir/${stem}-decrypted.pdf"
+    tmp="$out.tmp.$$.pdf"
+
+    echo "Writing: $out" >&2
+    qpdf --warning-exit-0 --password-file="$unlock_file" --decrypt "$input" "$tmp"
+    qpdf --warning-exit-0 --check "$tmp"
+    mv "$tmp" "$out"
+    tmp=""
+  done
+
+  cleanup
+  trap - EXIT
+
 # Compress PDFs beside inputs, appending -compressed; set PDF_COMPRESS_QUALITY=screen|ebook|printer|prepress|default.
 [no-cd]
 compress-pdfs +inputs: (_cmd "gs") (_cmd "qpdf")
