@@ -18,8 +18,34 @@ undo = true
 guardian_approval = true
 prevent_idle_sleep = true
 workspace_dependencies = false
-codex_hooks = true
+hooks = true
 multi_agent_v2 = true
+
+[[hooks.SessionStart]]
+matcher = "^(startup|resume)$"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "bash ~/.codex/hooks/setup-worktree-envrc.sh"
+timeout = 5
+statusMessage = "Ensure .evnrc is set up (worktrees only)"
+
+[[hooks.PreToolUse]]
+matcher = ".*"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "bash -lc 'payload=$(cat); command=$(printf \"%s\" \"$payload\" | jq -r '\\''(.toolInput.command // .tool_input.command // .command // (try (.toolArgs | fromjson | .command) catch empty) // (try (.tool_args | fromjson | .command) catch empty) // .toolArgs.command // .tool_args.command // empty)'\\''); if printf \"%s\\n\" \"$command\" | grep -Eq '\\''(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*(add|commit|reset|rm|mv|update-index|checkout-index|read-tree)([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*restore([^;&|]*[[:space:]])--staged([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*apply([^;&|]*[[:space:]])--(cached|index)([[:space:]]|$)|(^|[;&|[:space:]])git[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*stash([^;&|]*[[:space:]])--staged([[:space:]]|$)'\\''; then echo \"Blocked: Codex may not change Git staged state or create commits.\" >&2; exit 2; fi'"
+timeout = 5
+statusMessage = "Checking Git index safety"
+
+[hooks.state]
+
+[hooks.state."/Users/arno/.codex/config.toml:session_start:0:0"]
+trusted_hash = "sha256:5c07df1d220eb7255d572aafc522f42c5397717590c3c7d2bcbc161cbbbd5599"
+
+[hooks.state."/Users/arno/.codex/config.toml:pre_tool_use:0:0"]
+trusted_hash = "sha256:4797fcf9b08a5c18a0fb0f3cdc3626113d329b692df5892534498b8625a4422f"
 
 [sandbox_workspace_write]
 network_access = true

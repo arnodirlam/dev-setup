@@ -17,10 +17,13 @@ _default:
 
 check: test
 
-test: test-cursor-hooks
+test: test-cursor-hooks test-codex-hooks
 
 test-cursor-hooks:
     @{{ dotfiles_dir }}/.cursor/hooks/test-prevent-secret-exposure.sh
+
+test-codex-hooks: (_cmd "direnv") (_cmd "git") (_cmd "jq")
+    @bash "{{ dotfiles_dir }}/.codex/hooks/test-setup-worktree-envrc.sh"
 
 # Private command to show dry-run message
 _show-dry-run-message $doit:
