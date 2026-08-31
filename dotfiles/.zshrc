@@ -129,6 +129,19 @@ zstyle ':completion:*' menu no
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 # Set description format for group support
 zstyle ':completion:*:descriptions' format '[%d]'
+# Switch groups using Left Arrow and Right Arrow
+zstyle ':fzf-tab:*' switch-group left right
+# Make the active group header easier to distinguish
+zstyle ':fzf-tab:*' active-group-style bold underline
+# Switch directly to groups 1-12 with F1-F12
+zstyle ':fzf-tab:*' select-group F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12
+# prefix group labels with their superscript index, e.g. ¹files, ²directories
+zstyle ':fzf-tab:*' group-label-indexes ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ¹⁰ ¹¹ ¹²
+zstyle ':fzf-tab:*' group-label-format '%i%d'
+# cancel the active group with `esc`; exit fzf if no group is active (fzf 0.45+)
+zstyle ':fzf-tab:*' cancel-group-or-exit esc
+# Frame previews with a sharp border
+zstyle ':fzf-tab:*' fzf-flags --preview-window=border-sharp
 
 # Preview directory contents when completing cd
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || tree -C $realpath 2>/dev/null || ls -1 $realpath'
@@ -152,6 +165,104 @@ _fzf_comprun() {
     *)            fzf "$@" --preview 'bat --style=numbers --color=always --line-range :500 {} 2>/dev/null || tree -C {} 2>/dev/null' ;;
   esac
 }
+
+zstyle ':fzf-tab:complete:-command-:tab-start' fzf-preview '
+  typeset -a tab_start_preview_words=()
+  typeset tab_start_preview_alias="" tab_start_preview_command="" tab_start_preview_mode=""
+  typeset tab_start_preview_parameter="" tab_start_preview_target=""
+
+  _tab_start_preview_run() {
+    local output
+    output="$("$@" </dev/null 2>&1)" && [[ -n "$output" ]] || return 1
+    print -r -- "$output"
+  }
+
+  case "$group" in
+    command)
+      tab_start_preview_mode=help
+      tab_start_preview_words=("$word")
+      ;;
+    alias)
+      tab_start_preview_mode=help
+      tab_start_preview_alias="${desc#"$word -> "}"
+      if [[ "$tab_start_preview_alias" == "$desc" ]]; then
+        tab_start_preview_words=("$word")
+      else
+        tab_start_preview_words=("${(@Q)${(z)tab_start_preview_alias}}")
+      fi
+      ;;
+    mix|history)
+      tab_start_preview_mode=command
+      tab_start_preview_words=("${(@Q)${(z)word}}")
+      tab_start_preview_command="${tab_start_preview_words[1]:-}"
+      if (( ${#tab_start_preview_words[@]} > 1 )); then
+        tab_start_preview_target="${tab_start_preview_words[-1]}"
+      fi
+      ;;
+    dir)
+      tab_start_preview_mode=command
+      tab_start_preview_command=cd
+      tab_start_preview_target="$word"
+      ;;
+    *)
+      tab_start_preview_mode=path
+      tab_start_preview_target="$word"
+      ;;
+  esac
+
+  if [[ "$tab_start_preview_mode" == help ]]; then
+    tab_start_preview_command="${tab_start_preview_words[1]:-}"
+    if [[ -n "$tab_start_preview_command" ]] &&
+        whence -w -- "$tab_start_preview_command" >/dev/null 2>&1; then
+      if command man -w "$tab_start_preview_command" >/dev/null 2>&1 &&
+          _tab_start_preview_run env \
+            MANWIDTH="${FZF_PREVIEW_COLUMNS:-80}" MANPAGER=cat PAGER=cat \
+            man "$tab_start_preview_command"; then
+        :
+      elif _tab_start_preview_run \
+          "$tab_start_preview_command" help "${tab_start_preview_words[@]:1}"; then
+        :
+      else
+        _tab_start_preview_run "${tab_start_preview_words[@]}" --help
+      fi
+    fi
+  else
+    case "$tab_start_preview_command" in
+      mix)
+        if [[ -n "${tab_start_preview_words[2]:-}" ]]; then
+          command mix help "${tab_start_preview_words[2]}" 2>/dev/null
+        fi
+        ;;
+      cd)
+        if [[ -n "$tab_start_preview_target" ]]; then
+          command tree -C -- "$tab_start_preview_target" 2>/dev/null | command head -200
+        fi
+        ;;
+      export|unset)
+        tab_start_preview_parameter="${tab_start_preview_target%%=*}"
+        if [[ "$tab_start_preview_parameter" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+          print -r -- "${(P)tab_start_preview_parameter-}"
+        fi
+        ;;
+      ssh)
+        if [[ -n "$tab_start_preview_target" ]]; then
+          command dig "$tab_start_preview_target" 2>/dev/null
+        fi
+        ;;
+      *)
+        [[ -n "$tab_start_preview_target" ]] ||
+          tab_start_preview_target="$tab_start_preview_command"
+        if [[ -n "$tab_start_preview_target" ]]; then
+          command bat --style=numbers --color=always --line-range :500 \
+            -- "$tab_start_preview_target" 2>/dev/null ||
+            command tree -C -- "$tab_start_preview_target" 2>/dev/null
+        fi
+        ;;
+    esac
+  fi
+'
+zstyle ':fzf-tab:complete:-command-:tab-start' \
+  fzf-flags --preview-window=wrap,wrap-word,border-sharp
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
