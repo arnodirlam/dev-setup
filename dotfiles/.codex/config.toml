@@ -39,14 +39,6 @@ command = "bash -lc 'payload=$(cat); command=$(printf \"%s\" \"$payload\" | jq -
 timeout = 5
 statusMessage = "Checking Git index safety"
 
-[hooks.state]
-
-[hooks.state."/Users/arno/.codex/config.toml:session_start:0:0"]
-trusted_hash = "sha256:5c07df1d220eb7255d572aafc522f42c5397717590c3c7d2bcbc161cbbbd5599"
-
-[hooks.state."/Users/arno/.codex/config.toml:pre_tool_use:0:0"]
-trusted_hash = "sha256:4797fcf9b08a5c18a0fb0f3cdc3626113d329b692df5892534498b8625a4422f"
-
 [sandbox_workspace_write]
 network_access = true
 writable_roots = [
