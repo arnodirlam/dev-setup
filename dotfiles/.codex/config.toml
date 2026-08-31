@@ -1,7 +1,7 @@
 #:schema https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json
 
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 personality = "friendly"
 approval_policy = "on-request"
 approvals_reviewer = "guardian_subagent"
@@ -51,11 +51,42 @@ trusted_hash = "sha256:4797fcf9b08a5c18a0fb0f3cdc3626113d329b692df5892534498b862
 network_access = true
 writable_roots = [
   "/Users/arno/.cache/nix",
+  "/Users/arno/.cache/uv",
   "/Users/arno/.cache/zig",
   "/Users/arno/.dev-browser",
   "/Users/arno/.hex",
   "/Users/arno/.local/share/mise",
   "/Users/arno/.mise",
   "/Users/arno/.npm",
+  "/Users/arno/.npm_ex",
   "/Users/arno/.ollama",
 ]
+
+[desktop]
+sansFontSize = 15
+codeFontSize = 14
+usePointerCursors = true
+mac-menu-bar-enabled = false
+followUpQueueMode = "queue"
+reviewDelivery = "inline"
+localeOverride = "en-US"
+preventSleepWhileRunning = true
+keepRemoteControlAwakeWhilePluggedIn = false
+git-pull-request-merge-method = "squash"
+git-show-sidebar-pr-icons = true
+git-commit-instructions = """
+Always use single-line commit messages with the following structure:
+
+- Broad code area/module (one or two words) with a colon `:` and space, if applicable, e.g. "CI: "
+- Capitalized verb in imperative form, e.g. "Add "
+- Specific but short description of the change - every word counts
+- use commas and ampersand `&` for enumerations
+- Separate multiple changes in the same area by comma `,`, e.g. "Add tests, Update config"
+- Separate areas by semicolon `;`, e.g. "CI: Cache build dir; Justfile: Add `check` command""""
+notifications-turn-mode = "always"
+conversationDetailMode = "STEPS_COMMANDS"
+show-context-window-usage = true
+dock-icon-preference = "codex-system"
+
+[desktop.open-in-target-preferences]
+global = "cursor"
