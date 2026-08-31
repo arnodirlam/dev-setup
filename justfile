@@ -7,7 +7,8 @@ dotfiles_dir := justfile_directory() / "dotfiles"
 home_dir := env_var('HOME')
 dotfiles_dir_short := replace_regex(dotfiles_dir, "^" + home_dir, "~")
 brewfile_path := justfile_directory() / "Brewfile"
-plugins_file := justfile_directory() / "omz_plugins"
+omz_plugins_file := justfile_directory() / "omz_plugins"
+omz_plugins_file_short := replace_regex(omz_plugins_file, "^" + home_dir, "~")
 
 # Default recipe - show available commands
 [default]
@@ -33,6 +34,68 @@ _show-dry-run-message $doit:
         echo -e "{{ BLUE }}   Run with doit=true to perform the actual operation.{{ NORMAL }}"
         echo
     fi
+
+_cmd cmd:
+    @command -v "{{ cmd }}" >/dev/null || { echo "Missing command: {{ cmd }}" >&2; exit 1; }
+
+# Resolve optional pin, otherwise latest stable GitHub release or default-branch HEAD.
+_omz-plugin-target $url $pin="": (_cmd "curl") (_cmd "git") (_cmd "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    temp_dir=$(mktemp -d /tmp/omz-plugin-target.XXXXXX)
+    trap 'rm -rf -- "$temp_dir"' EXIT
+
+    target_ref=${pin:-HEAD}
+    target_label="$pin"
+    target_kind=pin
+
+    if [[ -z "$pin" ]]; then
+        target_kind=commit
+
+        github_repo=''
+        case "$url" in
+            https://github.com/*) github_repo=${url#https://github.com/} ;;
+            git@github.com:*) github_repo=${url#git@github.com:} ;;
+            ssh://git@github.com/*) github_repo=${url#ssh://git@github.com/} ;;
+        esac
+        github_repo=${github_repo%.git}
+        github_repo=${github_repo%/}
+
+        if [[ -n "$github_repo" ]]; then
+            release_file="$temp_dir/release.json"
+            if ! http_status=$(curl --silent --show-error --location \
+                --header 'Accept: application/vnd.github+json' \
+                --output "$release_file" \
+                --write-out '%{http_code}' \
+                "https://api.github.com/repos/$github_repo/releases/latest"); then
+                echo "Unable to query latest release for $url" >&2
+                exit 1
+            fi
+
+            case "$http_status" in
+                200)
+                    target_ref=$(jq -er '.tag_name' "$release_file")
+                    target_label="$target_ref"
+                    target_kind=release
+                    ;;
+                404) ;;
+                *)
+                    echo "GitHub release lookup failed for $url (HTTP $http_status)" >&2
+                    exit 1
+                    ;;
+            esac
+        fi
+    fi
+
+    git -C "$temp_dir" init --bare --quiet
+    if ! git -C "$temp_dir" fetch --quiet --depth=1 "$url" "$target_ref"; then
+        echo "Unable to fetch $target_ref from $url" >&2
+        exit 1
+    fi
+    target_commit=$(git -C "$temp_dir" rev-parse 'FETCH_HEAD^{commit}')
+    target_label=${target_label:-${target_commit:0:7}}
+    printf '%s\t%s\t%s\t%s\n' "$target_commit" "$target_label" "$target_kind" "$target_ref"
 
 # Replace hardcoded home paths with actual $HOME
 replace-home-paths $doit="false": && (_show-dry-run-message doit)
@@ -346,27 +409,34 @@ omz-plugins-dump $doit="false": && (_show-dry-run-message doit)
     echo -e "{{ BLUE }}${log_prefix}📦 Exporting custom plugins from $plugins_dir...{{ NORMAL }}"
 
     # Collect git remote URLs
-    temp_file=$(mktemp)
+    temp_file=$(mktemp /tmp/omz-plugins.XXXXXX)
 
-    # Find directories with .git subdirectory
+    # Find plugin checkouts, including worktrees whose .git is a file.
     while IFS= read -r plugin_dir; do
         [[ -z "$plugin_dir" ]] && continue
+        [[ -e "$plugin_dir/.git" ]] || continue
+        git -C "$plugin_dir" rev-parse --git-dir >/dev/null 2>&1 || continue
         plugin_name=$(basename "$plugin_dir")
 
         # Get git remote URL
         remote_url=$(git -C "$plugin_dir" remote get-url origin 2>/dev/null)
         if [[ -n "$remote_url" ]]; then
-            # Write as: plugin_name<TAB>git_url
-            printf "%s\t%s\n" "$plugin_name" "$remote_url" >> "$temp_file"
-            echo -e "{{ GREEN }}${log_prefix}✅ Found: $plugin_name -> $remote_url{{ NORMAL }}"
+            pin=$(awk -F '\t' -v plugin_name="$plugin_name" '$1 == plugin_name { print $3; exit }' "{{ omz_plugins_file }}")
+            if [[ -n "$pin" ]]; then
+                printf "%s\t%s\t%s\n" "$plugin_name" "$remote_url" "$pin" >> "$temp_file"
+                echo -e "{{ GREEN }}${log_prefix}✅ Found: $plugin_name -> $remote_url at $pin{{ NORMAL }}"
+            else
+                printf "%s\t%s\n" "$plugin_name" "$remote_url" >> "$temp_file"
+                echo -e "{{ GREEN }}${log_prefix}✅ Found: $plugin_name -> $remote_url{{ NORMAL }}"
+            fi
         else
             echo -e "{{ YELLOW }}${log_prefix}⚠️  Skipping $plugin_name (no remote configured){{ NORMAL }}"
         fi
-    done < <(find "$plugins_dir" -mindepth 2 -maxdepth 2 -type d -name .git -exec dirname {} \;)
+    done < <(find "$plugins_dir" -mindepth 1 -maxdepth 1 -print | sort)
 
     # Write to output file (sorted alphabetically)
-    echo -e "{{ BLUE }}${log_prefix}📝 Writing plugins to {{ plugins_file }}...{{ NORMAL }}"
-    [[ "$doit" == "true" ]] && sort "$temp_file" > "{{ plugins_file }}" || true
+    echo -e "{{ BLUE }}${log_prefix}📝 Writing plugins to {{ omz_plugins_file }}...{{ NORMAL }}"
+    [[ "$doit" == "true" ]] && sort "$temp_file" > "{{ omz_plugins_file }}" || true
     rm -f "$temp_file"
 
 # Install oh-my-zsh custom plugins from file
@@ -378,8 +448,8 @@ omz-plugins-install $doit="false": && (_show-dry-run-message doit)
     [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
     # Check if plugins file exists
-    if [[ ! -f "{{ plugins_file }}" ]]; then
-        echo -e "{{ RED }}❌ Plugins file not found: {{ plugins_file }}{{ NORMAL }}" >&2
+    if [[ ! -f "{{ omz_plugins_file }}" ]]; then
+        echo -e "{{ RED }}❌ Plugins file not found: {{ omz_plugins_file }}{{ NORMAL }}" >&2
         echo -e "{{ BLUE }}💡 Run 'just omz-plugins-dump' to export plugins first{{ NORMAL }}" >&2
         exit 1
     fi
@@ -395,8 +465,8 @@ omz-plugins-install $doit="false": && (_show-dry-run-message doit)
 
     echo -e "{{ BLUE }}${log_prefix}📦 Installing plugins to $plugins_dir...{{ NORMAL }}"
 
-    # Read plugin names and URLs from file (format: plugin_name<TAB>url)
-    while IFS=$'\t' read -r plugin_name url || [[ -n "$plugin_name" ]]; do
+    # Read plugin sources from file (format: plugin_name<TAB>url[<TAB>pin])
+    while IFS=$'\t' read -r plugin_name url pin || [[ -n "$plugin_name" ]]; do
         # Skip empty lines
         if [[ -z "$plugin_name" ]] || [[ -z "$url" ]]; then
             continue
@@ -406,23 +476,46 @@ omz-plugins-install $doit="false": && (_show-dry-run-message doit)
 
         # Check if plugin already exists
         if [[ -d "$target_dir" ]]; then
-            echo -e "{{ GREEN }}${log_prefix}✅ Already installed: $plugin_name{{ NORMAL }}"
-            continue
-        fi
-
-        # Clone the plugin
-        echo -e "{{ BLUE }}${log_prefix}📥 Installing: $plugin_name from $url{{ NORMAL }}"
-        if [[ "$doit" == "true" ]]; then
-            if ! git clone "$url" "$target_dir" 2>/dev/null; then
-                echo -e "{{ RED }}❌ Failed to install: $plugin_name{{ NORMAL }}"
+            if [[ -e "$target_dir/.git" ]] && git -C "$target_dir" rev-parse --git-dir >/dev/null 2>&1; then
+                installed=$(git -C "$target_dir" describe --tags --exact-match 2>/dev/null || git -C "$target_dir" rev-parse --short=7 HEAD)
+                if ! git -C "$target_dir" diff --quiet || ! git -C "$target_dir" diff --cached --quiet || [[ -n "$(git -C "$target_dir" ls-files --others --exclude-standard)" ]]; then
+                    installed+="-dirty"
+                fi
+                echo -e "{{ GREEN }}${log_prefix}✅ Already installed: $plugin_name at $installed{{ NORMAL }}"
+                continue
+            elif [[ -n "$(find "$target_dir" -mindepth 1 -print -quit)" ]]; then
+                echo -e "{{ YELLOW }}${log_prefix}⚠️  Skipping $plugin_name (existing directory is not a Git checkout){{ NORMAL }}"
+                continue
             fi
         fi
-    done < "{{ plugins_file }}"
+
+        if ! target=$(just _omz-plugin-target "$url" "$pin"); then
+            echo -e "{{ YELLOW }}${log_prefix}⚠️ $plugin_name: unable to resolve latest version{{ NORMAL }}"
+            continue
+        fi
+        IFS=$'\t' read -r target_commit target_label target_kind target_ref <<< "$target"
+
+        echo -e "{{ BLUE }}${log_prefix}📥 Installing: $plugin_name at $target_label from $url{{ NORMAL }}"
+        if [[ "$doit" == "true" ]]; then
+            if ! git init --quiet "$target_dir" ||
+                ! git -C "$target_dir" remote add origin "$url" ||
+                ! git -C "$target_dir" fetch --quiet origin "$target_ref"; then
+                echo -e "{{ RED }}❌ Failed to install: $plugin_name{{ NORMAL }}"
+            elif git -C "$target_dir" checkout --quiet --detach FETCH_HEAD; then
+                echo -e "{{ GREEN }}✅ Installed: $plugin_name at $target_label{{ NORMAL }}"
+            else
+                echo -e "{{ RED }}❌ Installed repository but failed to check out: $plugin_name at $target_label{{ NORMAL }}"
+            fi
+        fi
+    done < "{{ omz_plugins_file }}"
 
 # Update oh-my-zsh custom plugins
-zsh-plugins-update:
+omz-plugins-update $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Determine mode from boolean argument
+    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
     plugins_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
 
@@ -433,33 +526,54 @@ zsh-plugins-update:
         exit 1
     fi
 
-    echo -e "{{ BLUE }}🔄 Updating custom plugins in $plugins_dir...{{ NORMAL }}"
+    echo -e "{{ BLUE }}${log_prefix}🔄 Checking plugin updates from {{ omz_plugins_file_short }}...{{ NORMAL }}"
 
-    # Update each plugin directory that is a git repository
-    while IFS= read -r plugin_dir; do
-        [[ -z "$plugin_dir" ]] && continue
-        plugin_name=$(basename "$plugin_dir")
+    while IFS=$'\t' read -r plugin_name url pin || [[ -n "$plugin_name" ]]; do
+        [[ -z "$plugin_name" ]] || [[ -z "$url" ]] && continue
 
-        if git -C "$plugin_dir" rev-parse --git-dir >/dev/null 2>&1; then
-            # Fetch latest changes from remote
-            git -C "$plugin_dir" fetch --quiet >/dev/null 2>&1 || true
+        plugin_dir="$plugins_dir/$plugin_name"
+        if [[ ! -e "$plugin_dir/.git" ]] || ! git -C "$plugin_dir" rev-parse --git-dir >/dev/null 2>&1; then
+            echo -e "{{ YELLOW }}${log_prefix}⚠️ $plugin_name: not installed{{ NORMAL }}"
+            continue
+        fi
 
-            # Check if there are updates available
-            local_commit=$(git -C "$plugin_dir" rev-parse HEAD)
-            remote_commit=$(git -C "$plugin_dir" rev-parse @{u} 2>/dev/null || echo "$local_commit")
+        installed_commit=$(git -C "$plugin_dir" rev-parse HEAD)
+        installed_label=$(git -C "$plugin_dir" describe --tags --exact-match 2>/dev/null || git -C "$plugin_dir" rev-parse --short=7 HEAD)
+        if ! git -C "$plugin_dir" diff --quiet || ! git -C "$plugin_dir" diff --cached --quiet || [[ -n "$(git -C "$plugin_dir" ls-files --others --exclude-standard)" ]]; then
+            echo -e "{{ YELLOW }}${log_prefix}⚠️ $plugin_name: skipping dirty checkout{{ NORMAL }}"
+            continue
+        fi
 
-            if [[ "$local_commit" == "$remote_commit" ]]; then
-                echo -e "{{ GREEN }}✅ Up to date: $plugin_name{{ NORMAL }}"
+        if ! target=$(just _omz-plugin-target "$url" "$pin"); then
+            echo -e "{{ YELLOW }}${log_prefix}⚠️ $plugin_name: unable to resolve latest version{{ NORMAL }}"
+            continue
+        fi
+        IFS=$'\t' read -r target_commit target_label target_kind target_ref <<< "$target"
+
+        details_url=''
+        if [[ "$target_kind" == "release" ]] && [[ "$url" == https://github.com/* ]]; then
+            repository_url=${url%.git}
+            details_url="$repository_url/releases/tag/$target_label"
+        fi
+
+        if [[ "$installed_commit" == "$target_commit" ]]; then
+            echo -e "{{ GREEN }}${log_prefix}✅ $plugin_name: $target_label{{ NORMAL }}"
+            continue
+        fi
+
+        echo -e "{{ BLUE }}${log_prefix}🔄 $plugin_name: $installed_label -> $target_label{{ NORMAL }}"
+        [[ -n "$details_url" ]] && echo -e "{{ BLUE }}${log_prefix}   details: $details_url{{ NORMAL }}"
+
+        if [[ "$doit" == "true" ]]; then
+            if ! git -C "$plugin_dir" fetch --quiet "$url" "$target_ref"; then
+                echo -e "{{ RED }}❌ Failed to fetch: $plugin_name{{ NORMAL }}"
+            elif git -C "$plugin_dir" checkout --quiet --detach FETCH_HEAD; then
+                echo -e "{{ GREEN }}✅ Updated: $plugin_name at $target_label{{ NORMAL }}"
             else
-                echo -e "{{ BLUE }}🔄 Updating: $plugin_name{{ NORMAL }}"
-                if git -C "$plugin_dir" pull --quiet >/dev/null 2>&1; then
-                    echo -e "{{ GREEN }}✅ Updated: $plugin_name{{ NORMAL }}"
-                else
-                    echo -e "{{ RED }}❌ Failed to update: $plugin_name{{ NORMAL }}"
-                fi
+                echo -e "{{ RED }}❌ Failed to check out: $plugin_name at $target_label{{ NORMAL }}"
             fi
         fi
-    done < <(find "$plugins_dir" -mindepth 2 -maxdepth 2 -type d -name .git -exec dirname {} \; | sort)
+    done < "{{ omz_plugins_file }}"
 
 # Generate Brewfile from currently installed packages
 brew-dump $doit="false": && (_show-dry-run-message doit)
