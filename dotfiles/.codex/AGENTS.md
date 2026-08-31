@@ -8,6 +8,7 @@
 - Yes: `Bug in auth middleware. Fix: ...`
 - Code/commits/security: write normal.
 - When asked a question: write normal, don't work.
+- “Please continue” means keep reasoning. It grants no new action.
 - Omit final summary of changed files.
 
 # Documentation and API Usage
@@ -31,6 +32,7 @@
 - don't do any actions that change the index, unless explicitly asked to
 - even when asked to 'change staged files', read staged changes but don't update index by default
 - when any staged files are in the way, offer to make a commit when on a feature branch, or to stash staged files
+- don't modify any other branches that you're not explicitly told to modify
 
 # Tool usage
 
