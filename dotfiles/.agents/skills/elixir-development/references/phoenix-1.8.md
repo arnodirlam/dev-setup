@@ -8,4 +8,3 @@ Apply only when the project retains the relevant generated components and authen
 - Use the generated `<.icon>` component rather than calling Heroicons modules directly.
 - Use the generated `<.input>` component when it supports the required form control.
 - Supply complete styling when overriding generated input classes because custom classes replace generated defaults.
-- For end-to-end tests, use the library `phoenix_test_playwright` when JavaScript needs to be tested, and `phoenix_test` otherwise.

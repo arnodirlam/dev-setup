@@ -1,6 +1,6 @@
 #:schema https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json
 
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 model_reasoning_effort = "medium"
 personality = "friendly"
 approval_policy = "on-request"

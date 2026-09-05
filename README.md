@@ -59,7 +59,22 @@ just link .config/fish/config.fish doit=true
 just import .vimrc doit=true
 ```
 
-All these commands create **backups** of existing files (when not in dry-run).
+All these commands back up existing destinations before replacing them (when not in dry-run). Linking uses `.backup`, then `.backup.1`, `.backup.2`, etc., without replacing earlier backups. An already-correct symlink needs no backup and is left unchanged.
+
+Add an empty `.link-directory` marker inside any directory that should be linked as a whole. Both `just link` and `just link-all` link that directory and skip its contents; unmarked directories keep file-by-file linking. For example:
+
+```text
+dotfiles/.agents/skills/elixir-development/
+  .link-directory
+  SKILL.md
+  references/
+```
+
+```bash
+just link .agents/skills/elixir-development true
+```
+
+This creates one directory symlink, keeping `SKILL.md` a regular file for Codex discovery. Linking a child path also resolves to the outermost marked directory. Existing destination directories are preserved in a backup during migration.
 
 **Directory structure:**
 ```

@@ -17,7 +17,10 @@ _default:
 
 check: test
 
-test: test-cursor-hooks test-codex-hooks
+test: test-cursor-hooks test-codex-hooks test-dotfiles-linking
+
+test-dotfiles-linking:
+    @bash "{{ justfile_directory() }}/tests/test-dotfiles-linking.sh"
 
 test-cursor-hooks:
     @{{ dotfiles_dir }}/.cursor/hooks/test-prevent-secret-exposure.sh
@@ -161,84 +164,98 @@ bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (brew-a
         done
     done
 
-# Link a single file from dotfiles/ to ~/
+# Link a file or a directory marked with .link-directory from dotfiles/ to ~/
 link $relative_path $doit="false": && (_show-dry-run-message doit)
-    @just _link "$relative_path" "$doit"
+    @just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link "$relative_path" "$doit"
 
-# Private implementation for linking a single file
+# Private implementation shared by link and link-all
 _link $relative_path $doit="false":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Determine mode from boolean argument
     [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
-    # Normalize the relative path by removing common prefixes
-    normalized_path="$(echo "$relative_path" \
-        | sed "s|^dotfiles/||" \
-        | sed "s|^{{ dotfiles_dir }}/||" \
-        | sed "s|^~/||" \
-        | sed "s|^{{ home_dir }}/||" \
-        )"
+    # Accept repository-relative paths and absolute source/destination paths.
+    case "$relative_path" in
+        "{{ dotfiles_dir }}/"*) normalized_path=${relative_path#"{{ dotfiles_dir }}/"} ;;
+        "{{ home_dir }}/"*) normalized_path=${relative_path#"{{ home_dir }}/"} ;;
+        dotfiles/*) normalized_path=${relative_path#dotfiles/} ;;
+        '~/'*) normalized_path=${relative_path#'~/'} ;;
+        *) normalized_path=$relative_path ;;
+    esac
+    normalized_path=${normalized_path%/}
+    case "/$normalized_path/" in
+        //*|*/../*|*/./*)
+            echo "Invalid dotfiles path: $relative_path" >&2
+            exit 1
+            ;;
+    esac
 
-    # Construct paths
+    # Linking a child also links the outermost marked directory as a unit.
+    candidate=$normalized_path
+    while [[ "$candidate" != . ]]; do
+        if [[ -d "{{ dotfiles_dir }}/$candidate" && -f "{{ dotfiles_dir }}/$candidate/.link-directory" ]]; then
+            normalized_path=$candidate
+        fi
+        candidate=$(dirname "$candidate")
+    done
+
     source_file="{{ dotfiles_dir }}/$normalized_path"
     source_file_short="{{ dotfiles_dir_short }}/$normalized_path"
     target_file="{{ home_dir }}/$normalized_path"
     target_file_short="~/$normalized_path"
 
-    # Check if source file exists
-    if [[ ! -f "$source_file" ]]; then
-        echo -e "{{ RED }}❌ Error: Source file does not exist: $source_file_short{{ NORMAL }}" >&2
-        if [[ -e "$target_file" ]]; then
-            echo -e "{{ BLUE }}💡 Did you mean to use 'just import' to import an existing file?{{ NORMAL }}" >&2
-        fi
+    # Unmarked directories retain file-by-file linking.
+    if [[ ! -f "$source_file" && ! ( -d "$source_file" && -f "$source_file/.link-directory" ) ]]; then
+        echo "Expected a file or marked directory: $source_file_short" >&2
         exit 1
     fi
 
-    # Create parent directories if they don't exist
     parent_dir=$(dirname "$target_file")
     if [[ ! -d "$parent_dir" ]]; then
-        echo -e "{{ BLUE }}${log_prefix}📁 Creating directory: $parent_dir{{ NORMAL }}"
-        [[ "$doit" == "true" ]] && mkdir -p "$parent_dir"
-    fi
-
-    # Handle existing files
-    if [[ -e "$target_file" ]] || [[ -L "$target_file" ]]; then
-        # Check if it's an identical symlink
-        if [[ -L "$target_file" ]]; then
-            target_link=$(readlink "$target_file")
-            if [[ "$target_link" == "$source_file" ]]; then
-                echo -e "{{ GREEN }}${log_prefix}✅ Identical symlink exists: $target_file_short{{ NORMAL }}"
-                exit 0
-            fi
-            echo -e "{{ YELLOW }}${log_prefix}💾 Backing up existing symlink: $target_file_short -> $target_file_short.backup{{ NORMAL }}"
-        else
-            echo -e "{{ YELLOW }}${log_prefix}💾 Backing up existing file: $target_file_short -> $target_file_short.backup{{ NORMAL }}"
+        echo "${log_prefix}Creating directory: $parent_dir"
+        if [[ "$doit" == "true" ]]; then
+            mkdir -p "$parent_dir"
         fi
-        [[ "$doit" == "true" ]] && mv "$target_file" "$target_file.backup"
     fi
 
-    # Create the symlink
-    echo -e "{{ GREEN }}${log_prefix}🔗 Creating symlink: $target_file_short -> $source_file_short{{ NORMAL }}"
-    [[ "$doit" == "true" ]] && ln -s "$source_file" "$target_file" || true
+    if [[ -e "$target_file" || -L "$target_file" ]]; then
+        if [[ -L "$target_file" && $(readlink "$target_file") == "$source_file" ]]; then
+            echo "${log_prefix}Identical symlink exists: $target_file_short"
+            exit 0
+        fi
+        backup_path=$target_file.backup
+        backup_index=0
+        while [[ -e "$backup_path" || -L "$backup_path" ]]; do
+            backup_index=$((backup_index + 1))
+            backup_path=$target_file.backup.$backup_index
+        done
+        echo "${log_prefix}Backing up existing path: $target_file_short -> $backup_path"
+        if [[ "$doit" == "true" ]]; then
+            mv "$target_file" "$backup_path"
+        fi
+    fi
 
-# Link all files in dotfiles/ to ~/
+    echo "${log_prefix}Linking: $target_file_short -> $source_file_short"
+    if [[ "$doit" == "true" ]]; then
+        ln -s "$source_file" "$target_file"
+    fi
+
+# Link files and marked directories from dotfiles/ to ~/
 link-all $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Determine mode from boolean argument
-    [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
-
-    echo -e "{{ BLUE }}${log_prefix}🔗 Linking dotfiles from {{ dotfiles_dir_short }} to ~{{ NORMAL }}"
-    echo
-
-    # Find all files in dotfiles directory and process them
-    if ! find "{{ dotfiles_dir }}" -type f -exec just _link {} "$doit" \; ; then
-        echo -e "{{ RED }}❌ Error: Failed to process dotfiles directory{{ NORMAL }}" >&2
-        exit 1
-    fi
+    # Prune marked directories: link each once, never their individual files.
+    # Materialize the list so traversal failures propagate before linking starts.
+    link_list=$(mktemp)
+    trap 'rm -f -- "$link_list"' EXIT
+    find "{{ dotfiles_dir }}" -mindepth 1 \
+        \( -type d -exec test -f '{}/.link-directory' \; -prune -print0 \) -o \
+        \( -type f ! -name .link-directory -print0 \) > "$link_list"
+    while IFS= read -r -d '' source_path; do
+        just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link "$source_path" "$doit"
+    done < "$link_list"
 
 # Import an existing file from ~/ to dotfiles/
 import $relative_path $doit="false": && (_show-dry-run-message doit)
