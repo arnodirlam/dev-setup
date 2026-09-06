@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dependency Updates"
+  short_description: "Upgrade dependencies one reviewed batch at a time"
+  default_prompt: "Use $dependency-updates to research this project's dependency upgrades, prepare the first batch, and stop for my review before continuing."
