@@ -25,12 +25,14 @@ else
   Plug 'Xuyuanp/nerdtree-git-plugin'            " Git markers for Nerdtree
   Plug 'neomake/neomake'                        " Runs code checks automatically
   Plug 'tpope/vim-rails', { 'for': 'ruby' }
-  Plug 'tpope/vim-endwise', { 'for': 'ruby' }
   Plug 'flazz/vim-colorschemes'
   Plug 'xolox/vim-colorscheme-switcher'
   Plug 'xolox/vim-misc'
   Plug 'elixir-lang/vim-elixir'
   Plug 'slashmili/alchemist.vim'
+  if has('nvim')
+    Plug 'f-person/auto-dark-mode.nvim'
+  endif
   " Plug 'Valloric/YouCompleteMe', { 'do': './install.py' }
   call plug#end()
 
@@ -51,8 +53,43 @@ else
   " colorscheme flatland
   " colorscheme kruby
   " colorscheme lucid
+  if has('macunix')
+    let s:apple_style = trim(system('defaults read -g AppleInterfaceStyle 2>/dev/null'))
+    if s:apple_style ==# 'Dark'
+      let g:lucius_style = 'dark'
+    else
+      let g:lucius_style = 'light'
+    endif
+    unlet s:apple_style
+  endif
   colorscheme lucius
   " colorscheme obsidian
+
+  if has('nvim')
+    lua << EOF
+vim.lsp.config('expert', {
+  cmd = { 'expert', '--stdio' },
+  root_markers = { 'mix.exs', '.git' },
+  filetypes = { 'elixir', 'eelixir', 'heex' },
+})
+vim.lsp.enable('expert')
+
+local ok, auto_dark_mode = pcall(require, 'auto-dark-mode')
+if ok then
+  auto_dark_mode.setup({
+    fallback = 'dark',
+    set_dark_mode = function()
+      vim.g.lucius_style = 'dark'
+      vim.cmd('colorscheme lucius')
+    end,
+    set_light_mode = function()
+      vim.g.lucius_style = 'light'
+      vim.cmd('colorscheme lucius')
+    end,
+  })
+end
+EOF
+  endif
 
 
   "Vim-airline
@@ -95,14 +132,16 @@ else
   """""""""""""""""""
   " => Key bindings "
   """""""""""""""""""
-  set pastetoggle=<F9>
   map <C-n> :NERDTreeToggle<CR>
 
 
   """""""""""""""
   " => Triggers "
   """""""""""""""
-  autocmd! BufWritePost * Neomake
+  augroup neomake_on_save
+    autocmd!
+    autocmd BufWritePost * if index(['elixir', 'eelixir', 'heex'], &filetype) < 0 | Neomake | endif
+  augroup END
 
   augroup elixir
     autocmd!
