@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upstream Contributions"
+  short_description: "Concise issues and PRs that fit project conventions"
+  default_prompt: "Use $upstream-contributions to prepare this contribution in the project's existing style."
