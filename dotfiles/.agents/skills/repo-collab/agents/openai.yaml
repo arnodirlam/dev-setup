@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repository Collaboration"
+  short_description: "Concise issues and PRs that fit project conventions"
+  default_prompt: "Use $repo-collab to prepare this contribution in the project's existing style."
