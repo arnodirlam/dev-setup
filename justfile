@@ -133,7 +133,7 @@ create-dev-dir $doit="false": && (_show-dry-run-message doit)
     fi
 
 # Bootstrap the dev environment
-bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (brew-apply doit) (link-all doit) && (_show-dry-run-message doit)
+bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (brew-apply doit) (link-all doit) (keyboard-install doit) && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -164,7 +164,84 @@ bootstrap $doit="false": (replace-home-paths doit) (create-dev-dir doit) (brew-a
         done
     done
 
-# Link a file or a directory marked with .link-directory from dotfiles/ to ~/
+# Install the U.S. with German Umlauts keyboard layout for all macOS users
+keyboard-install $doit="false": (_cmd "curl") (_cmd "tar") (_cmd "diff") && (_show-dry-run-message doit)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [[ "$(uname -s)" != Darwin ]]; then
+        echo "Skipping keyboard layout installation (macOS only)."
+        exit 0
+    fi
+
+    bundle="US-with-German-Umlauts.bundle"
+    layouts_dir="/Library/Keyboard Layouts"
+    temp_dir=$(mktemp -d /tmp/keyboard-install.XXXXXX)
+    trap 'rm -rf -- "$temp_dir"' EXIT
+    curl --fail --silent --show-error --location \
+        https://api.github.com/repos/patrick-zippenfenig/us-with-german-umlauts/tarball/master \
+        --output "$temp_dir/layout.tar.gz"
+    tar -xzf "$temp_dir/layout.tar.gz" --strip-components=1 -C "$temp_dir"
+    if [[ ! -f "$temp_dir/$bundle/Contents/Info.plist" ]]; then
+        echo "Downloaded archive is missing the keyboard layout bundle." >&2
+        exit 1
+    fi
+    /usr/bin/plutil -lint -s "$temp_dir/$bundle/Contents/Info.plist"
+    backup_path=""
+    if [[ -e "$layouts_dir/$bundle" || -L "$layouts_dir/$bundle" ]]; then
+        if differences=$(LC_ALL=C diff -qr "$layouts_dir/$bundle" "$temp_dir/$bundle"); then
+            echo "Keyboard layout: already up to date."
+            exit 0
+        else
+            diff_status=$?
+            if [[ "$diff_status" != 1 ]]; then
+                echo "Keyboard layout comparison failed; leaving installation unchanged." >&2
+                exit "$diff_status"
+            fi
+        fi
+        echo "Keyboard layout: update available."
+        while IFS= read -r difference; do
+            difference=${difference//"$layouts_dir/$bundle"/installed}
+            difference=${difference//"$temp_dir/$bundle"/upstream}
+            if [[ "$difference" == 'Files installed/'* ]]; then
+                difference=${difference#Files installed/}
+                difference="Changed: ${difference% and upstream/* differ}"
+            fi
+            printf '  %s\n' "$difference"
+        done <<< "$differences"
+        backup_path="$layouts_dir/$bundle.backup"
+        backup_index=0
+        while [[ -e "$backup_path" || -L "$backup_path" ]]; do
+            backup_index=$((backup_index + 1))
+            backup_path="$layouts_dir/$bundle.backup.$backup_index"
+        done
+        if [[ "$doit" != "true" ]]; then
+            echo "[DRY RUN] Would back up and replace installed layout."
+            exit 0
+        fi
+    fi
+    if [[ "$doit" != "true" ]]; then
+        echo "[DRY RUN] Would install U.S. with German Umlauts."
+        exit 0
+    fi
+    sudo mkdir -p "$layouts_dir"
+    if [[ -n "$backup_path" ]]; then
+        sudo mv "$layouts_dir/$bundle" "$backup_path"
+        echo "Backup: $backup_path"
+    fi
+    if ! sudo cp -R "$temp_dir/$bundle" "$layouts_dir/"; then
+        echo "Keyboard layout installation failed.${backup_path:+ Previous layout preserved at $backup_path.}" >&2
+        exit 1
+    fi
+    if [[ -n "$backup_path" ]]; then
+        echo "Keyboard layout updated. Restart macOS if changes do not appear."
+    else
+        echo "Keyboard layout installed."
+        echo "Enable: System Settings > Keyboard > Input Sources > Edit… > + > English."
+        echo "Select U.S. with German Umlauts. Restart macOS if missing."
+    fi
+
+# Link a file or directory from dotfiles/ to ~/, respecting .link-directory markers
 link $relative_path $doit="false": && (_show-dry-run-message doit)
     @just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link "$relative_path" "$doit"
 
