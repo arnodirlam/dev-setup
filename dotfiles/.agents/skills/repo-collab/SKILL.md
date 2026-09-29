@@ -23,6 +23,7 @@ description: Prepare or update repository issues, feature proposals, pull reques
 - Use "I" where appropriate in comments to make them personal, especially when explaining decisions or observations. Do not use em dashes.
 - Describe the final scope for someone without conversation context. Remove abandoned approaches, stale descriptions, and statements about unrelated things the change does not do.
 - Prefer explicit wording such as "test covering this bug" over ambiguous uses of "regression". Call a bug a regression only when evidence shows previously working behavior broke.
+- Before changing a project, issue, or PR description authored by someone else, propose exact before/after replacements with enough unchanged context to locate each edit. Group them by project, issue, or PR. Prefer small wording changes; explain necessary broader rewrites. Refine the proposal with the user, then apply approved edits. If findings require a material change of plan, bring that decision back to the user.
 
 ## Author issues and proposals
 
@@ -41,6 +42,7 @@ description: Prepare or update repository issues, feature proposals, pull reques
 ## Respond to review feedback
 
 - Read the review and inspect affected code, then propose a numbered action list covering code changes, draft replies, and threads to leave untouched. Refine it with the user before changing code or posting replies, then execute the agreed batch after confirmation. If new findings require a material change of plan, bring that decision back to the user.
+- When the action list includes edits to descriptions authored by someone else, include the exact replacements and surrounding context in that list so the user can approve the combined batch.
 - Answer straightforward review questions directly before describing changes made in response. Put any brief change note last, e.g. "Added a code comment to make this clear."
 - Do not resolve review threads started by others. Leave them open for their authors to decide when their concerns are resolved.
 
