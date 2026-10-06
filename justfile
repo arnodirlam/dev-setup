@@ -252,7 +252,11 @@ _link $relative_path $doit="false":
 
     [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
-    # Accept repository-relative paths and absolute source/destination paths.
+    log() {
+        echo -e "${2:-"{{ NORMAL }}"}${log_prefix}${1//"{{ home_dir }}/"/'~/'}{{ NORMAL }}"
+    }
+
+    # Normalize relative path
     case "$relative_path" in
         "{{ dotfiles_dir }}/"*) normalized_path=${relative_path#"{{ dotfiles_dir }}/"} ;;
         "{{ home_dir }}/"*) normalized_path=${relative_path#"{{ home_dir }}/"} ;;
@@ -263,12 +267,12 @@ _link $relative_path $doit="false":
     normalized_path=${normalized_path%/}
     case "/$normalized_path/" in
         //*|*/../*|*/./*)
-            echo "Invalid dotfiles path: $relative_path" >&2
+            log "❌ Invalid relative path: $relative_path" "{{ RED }}" >&2
             exit 1
             ;;
     esac
 
-    # Linking a child also links the outermost marked directory or symlink as a unit.
+    # Linking a child links the outermost marked directory or symlink as a unit
     candidate=$normalized_path
     while [[ "$candidate" != . ]]; do
         if [[ -L "{{ dotfiles_dir }}/$candidate" ||
@@ -280,47 +284,48 @@ _link $relative_path $doit="false":
     done
 
     source_file="{{ dotfiles_dir }}/$normalized_path"
-    source_file_short="{{ dotfiles_dir_short }}/$normalized_path"
     target_file="{{ home_dir }}/$normalized_path"
-    target_file_short="~/$normalized_path"
 
-    # Unmarked directories retain file-by-file linking.
+    # Require a file, symlink, or marked directory
     if [[ ! -L "$source_file" &&
           ! -f "$source_file" &&
           ! -f "$source_file/.link-directory"
     ]]; then
-        echo "Expected a file, symlink, or marked directory: $source_file_short" >&2
+        log "❌ Expected a file, symlink, or marked directory: $source_file" "{{ RED }}" >&2
         exit 1
     fi
 
+    # Create target parent dir if missing
     parent_dir=$(dirname "$target_file")
-    parent_dir_short=$(dirname "$target_file_short")
     if [[ ! -d "$parent_dir" ]]; then
-        echo "${log_prefix}Creating directory: $parent_dir_short"
+        log "📁 Creating directory: $parent_dir" "{{ BLUE }}"
         if [[ "$doit" == "true" ]]; then
             mkdir -p "$parent_dir"
         fi
     fi
 
     if [[ -e "$target_file" || -L "$target_file" ]]; then
+        # Skip already-correct symlinks
         if [[ -L "$target_file" && $(readlink "$target_file") == "$source_file" ]]; then
-            echo "${log_prefix}Identical symlink exists: $target_file_short"
+            log "🔗 Already linked: $target_file -> $source_file"
             exit 0
         fi
+
+        # Back up existing target
         backup_path=$target_file.backup
         backup_index=0
         while [[ -e "$backup_path" || -L "$backup_path" ]]; do
             backup_index=$((backup_index + 1))
             backup_path=$target_file.backup.$backup_index
         done
-        backup_path_short="~/${backup_path#"{{ home_dir }}/"}"
-        echo "${log_prefix}Backing up existing path: $target_file_short -> $backup_path_short"
+        log "💾 Backing up existing target: $target_file -> $backup_path" "{{ BLUE }}"
         if [[ "$doit" == "true" ]]; then
             mv "$target_file" "$backup_path"
         fi
     fi
 
-    echo "${log_prefix}Linking: $target_file_short -> $source_file_short"
+    # Create the link
+    log "🔗 Linking: $target_file -> $source_file" "{{ GREEN }}"
     if [[ "$doit" == "true" ]]; then
         ln -s "$source_file" "$target_file"
     fi

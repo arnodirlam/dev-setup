@@ -155,8 +155,7 @@ just test
 
 ### Dry-Run Mode
 
-Setup commands with a `doit` parameter default to dry-run mode. Pass `true` as the final
-positional argument to apply changes; omit it to preview them.
+Setup commands with a `doit` parameter default to dry-run mode. Pass `true` as the final positional argument to apply changes; omit it to preview them.
 
 ```bash
 # Preview changes (dry-run)
@@ -168,7 +167,7 @@ just link-all true
 
 You'll see output like:
 ```
-[DRY RUN] Linking: ~/.zshrc -> ~/dev/dev-setup/dotfiles/.zshrc
+[DRY RUN] 🔗 Linking: ~/.zshrc -> ~/dev/dev-setup/dotfiles/.zshrc
 
 💡 This was a dry run. No files were actually modified.
    Pass true as the final argument to apply changes.
