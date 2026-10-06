@@ -268,10 +268,12 @@ _link $relative_path $doit="false":
             ;;
     esac
 
-    # Linking a child also links the outermost marked directory as a unit.
+    # Linking a child also links the outermost marked directory or symlink as a unit.
     candidate=$normalized_path
     while [[ "$candidate" != . ]]; do
-        if [[ -d "{{ dotfiles_dir }}/$candidate" && -f "{{ dotfiles_dir }}/$candidate/.link-directory" ]]; then
+        if [[ -L "{{ dotfiles_dir }}/$candidate" ||
+              -f "{{ dotfiles_dir }}/$candidate/.link-directory"
+        ]]; then
             normalized_path=$candidate
         fi
         candidate=$(dirname "$candidate")
@@ -283,14 +285,18 @@ _link $relative_path $doit="false":
     target_file_short="~/$normalized_path"
 
     # Unmarked directories retain file-by-file linking.
-    if [[ ! -f "$source_file" && ! ( -d "$source_file" && -f "$source_file/.link-directory" ) ]]; then
-        echo "Expected a file or marked directory: $source_file_short" >&2
+    if [[ ! -L "$source_file" &&
+          ! -f "$source_file" &&
+          ! -f "$source_file/.link-directory"
+    ]]; then
+        echo "Expected a file, symlink, or marked directory: $source_file_short" >&2
         exit 1
     fi
 
     parent_dir=$(dirname "$target_file")
+    parent_dir_short=$(dirname "$target_file_short")
     if [[ ! -d "$parent_dir" ]]; then
-        echo "${log_prefix}Creating directory: $parent_dir"
+        echo "${log_prefix}Creating directory: $parent_dir_short"
         if [[ "$doit" == "true" ]]; then
             mkdir -p "$parent_dir"
         fi
@@ -307,7 +313,8 @@ _link $relative_path $doit="false":
             backup_index=$((backup_index + 1))
             backup_path=$target_file.backup.$backup_index
         done
-        echo "${log_prefix}Backing up existing path: $target_file_short -> $backup_path"
+        backup_path_short="~/${backup_path#"{{ home_dir }}/"}"
+        echo "${log_prefix}Backing up existing path: $target_file_short -> $backup_path_short"
         if [[ "$doit" == "true" ]]; then
             mv "$target_file" "$backup_path"
         fi
@@ -329,7 +336,7 @@ link-all $doit="false": && (_show-dry-run-message doit)
     trap 'rm -f -- "$link_list"' EXIT
     find "{{ dotfiles_dir }}" -mindepth 1 \
         \( -type d -exec test -f '{}/.link-directory' \; -prune -print0 \) -o \
-        \( -type f ! -name .link-directory -print0 \) > "$link_list"
+        \( \( -type f -o -type l \) ! -name .link-directory -print0 \) > "$link_list"
     while IFS= read -r -d '' source_path; do
         just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link "$source_path" "$doit"
     done < "$link_list"

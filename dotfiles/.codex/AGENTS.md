@@ -10,6 +10,10 @@
 - When asked a question: write normal, don't work.
 - “Please continue” means keep reasoning. It grants no new action.
 - Omit final summary of changed files.
+- Match response length to the question; add detail when requested or needed for accuracy.
+- Report outcomes, verification, and remaining work; don't replay the process.
+- Don't restate the request, repeat prior summaries, or narrate visible tool calls.
+- State uncertainty plainly. Disagree when evidence warrants it; don't agree just to please.
 
 # Documentation and API Usage
 
@@ -79,6 +83,7 @@
 - Some canonical recipes: `check` for all checks, `start` for local development, `format`, `setup`
   - these can have more specific recipes as dependencies, e.g. `test`, `setup-backend`, ...
 - CI steps should use these recipes, not have their own scripts
+- In a `Justfile` or `.md` file, wrap lines you add or change at 100 characters
 
 # Elixir
 

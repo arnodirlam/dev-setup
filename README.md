@@ -55,41 +55,41 @@ just link-all true
 just link .zshrc true
 just link .config/fish/config.fish true
 
+# Link a whole marked directory
+just link .agents/skills/elixir-development true
+
 # Import an existing file from your home directory
 just import .vimrc true
 ```
 
-All these commands back up existing destinations before replacing them (when not in dry-run). Linking uses `.backup`, then `.backup.1`, `.backup.2`, etc., without replacing earlier backups. An already-correct symlink needs no backup and is left unchanged.
-
-Add an empty `.link-directory` marker inside any directory that should be linked as a whole. Both `just link` and `just link-all` link that directory and skip its contents; unmarked directories keep file-by-file linking. For example:
-
-```text
-dotfiles/.agents/skills/elixir-development/
-  .link-directory
-  SKILL.md
-  references/
-```
-
-```bash
-just link .agents/skills/elixir-development true
-```
-
-This creates one directory symlink, keeping `SKILL.md` a regular file for Codex discovery. Linking a child path also resolves to the outermost marked directory. Existing destination directories are preserved in a backup during migration.
+Linking backs up existing destinations as `.backup`, then `.backup.1`, `.backup.2`, etc., without replacing earlier backups. Already-correct symlinks are left unchanged.
 
 **Directory structure:**
-```
+
+```text
 dotfiles/
+├── .agents/
+│   └── skills/elixir-development/
+│       ├── .link-directory
+│       └── SKILL.md
+├── .codex/
+│   └── AGENTS.md
+├── .claude/
+│   ├── CLAUDE.md -> ../.codex/AGENTS.md
+│   └── skills/elixir-development -> ../../.agents/skills/elixir-development
 ├── .config/
 │   ├── fish/
 │   │   └── config.fish
-│   └── mise/
-│       └── config.toml
+│   ├── mise/
+│   │   └── config.toml
+│   └── opencode/
+│       └── AGENTS.md -> ../../.codex/AGENTS.md
 ├── .zshrc
 ├── .zshenv
 └── .zprofile
 ```
 
-When linked, these files appear in `~/` as symlinks pointing back to this repository.
+Home links point to these repo entries. Relative symlinks provide aliases for shared files and skills. An empty `.link-directory` makes `just link` and `just link-all` link that directory as one unit; ordinary directories are traversed file by file by `just link-all`. Linking a child path selects the outermost marked directory or directory symlink, leaving its contents intact.
 
 ### Homebrew Package Management
 
@@ -168,7 +168,7 @@ just link-all true
 
 You'll see output like:
 ```
-[DRY RUN] 🔗 Creating symlink: ~/.zshrc -> ~/dev/dev-setup/dotfiles/.zshrc
+[DRY RUN] Linking: ~/.zshrc -> ~/dev/dev-setup/dotfiles/.zshrc
 
 💡 This was a dry run. No files were actually modified.
    Pass true as the final argument to apply changes.

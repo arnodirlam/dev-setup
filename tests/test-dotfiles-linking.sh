@@ -42,6 +42,8 @@ mkdir -p "$source_root/ordinary/nested" "$source_root/bundle with spaces/nested"
 touch "$source_root/ordinary/nested/config" "$source_root/bundle with spaces/.link-directory"
 touch "$source_root/bundle with spaces/nested/.link-directory" "$source_root/bundle with spaces/nested/config"
 touch "$source_root/.hidden" "$source_root/line"$'\n'"break"
+mkdir -p "$source_root/dir"$'\n'"break"
+touch "$source_root/dir"$'\n'"break/config"
 run_just link-all
 [[ -z $(find "$target_root" -mindepth 1 -print) ]] || fail 'Dry run changed the destination'
 pass
@@ -51,6 +53,7 @@ assert_link "$target_root/ordinary/nested/config" "$source_root/ordinary/nested/
 assert_link "$target_root/bundle with spaces" "$source_root/bundle with spaces"
 assert_link "$target_root/.hidden" "$source_root/.hidden"
 assert_link "$target_root/line"$'\n'"break" "$source_root/line"$'\n'"break"
+assert_link "$target_root/dir"$'\n'"break/config" "$source_root/dir"$'\n'"break/config"
 [[ ! -L "$target_root/ordinary" && ! -L "$target_root/bundle with spaces/nested/config" ]] || fail 'Wrong link granularity'
 [[ ! -e "$source_root/bundle with spaces/nested/config.backup" ]] || fail 'Linked children through the directory symlink'
 pass
@@ -98,6 +101,44 @@ mkdir -p "$source_root/bundle"
 touch "$source_root/bundle/.link-directory"
 run_just link bundle/ true
 assert_link "$target_root/bundle" "$source_root/bundle"
+pass
+
+fixture 'shared agent symlinks'
+mkdir -p "$source_root/.agents/skills/example" "$source_root/.codex" "$source_root/.claude/skills"
+touch "$source_root/.agents/skills/example/.link-directory"
+printf 'Shared instructions\n' > "$source_root/.codex/AGENTS.md"
+printf 'Shared skill\n' > "$source_root/.agents/skills/example/SKILL.md"
+ln -s ../.codex/AGENTS.md "$source_root/.claude/CLAUDE.md"
+ln -s ../../.agents/skills/example "$source_root/.claude/skills/example"
+mkdir -p "$target_root/.codex" "$target_root/.claude/skills/example"
+printf 'Old instructions\n' > "$target_root/.codex/AGENTS.md"
+touch "$target_root/.claude/skills/example/local-only" "$target_root/.claude/skills/existing"
+run_just link-all
+[[ ! -L "$target_root/.codex/AGENTS.md" && ! -L "$target_root/.claude/skills/example" ]] || fail 'Symlink dry run changed destination'
+run_just link-all true
+for destination in .codex/AGENTS.md .claude/CLAUDE.md .agents/skills/example .claude/skills/example; do
+    assert_link "$target_root/$destination" "$source_root/$destination"
+done
+[[ $(cat "$target_root/.claude/CLAUDE.md") == 'Shared instructions' ]] || fail 'File symlink chain is broken'
+[[ $(cat "$target_root/.claude/skills/example/SKILL.md") == 'Shared skill' ]] || fail 'Directory symlink chain is broken'
+[[ ! -L "$source_root/.agents/skills/example/SKILL.md" ]] || fail 'Skill contents linked individually'
+[[ -f "$target_root/.codex/AGENTS.md.backup" && -f "$target_root/.claude/skills/example.backup/local-only" ]] || fail 'Symlink migration lost existing data'
+[[ -f "$target_root/.claude/skills/existing" ]] || fail 'Linking replaced unrelated skills'
+run_just link-all true
+run_just link .codex/AGENTS.md true
+run_just link .claude/skills/example/SKILL.md true
+[[ ! -e "$target_root/.codex/AGENTS.md.backup.1" && ! -e "$target_root/.claude/skills/example.backup.1" ]] || fail 'Repeat linking created a backup'
+[[ ! -L "$source_root/.agents/skills/example/SKILL.md" ]] || fail 'Alias child request modified source'
+pass
+
+fixture 'unmarked directory alias'
+mkdir -p "$source_root/ordinary dir"
+touch "$source_root/ordinary dir/config file"
+ln -s 'ordinary dir' "$source_root/alias dir"
+run_just link-all true
+assert_link "$target_root/alias dir" "$source_root/alias dir"
+run_just link 'alias dir/config file' true
+[[ -f "$target_root/alias dir/config file" && ! -L "$source_root/ordinary dir/config file" ]] || fail 'Unmarked alias child request modified source'
 pass
 
 fixture rejected

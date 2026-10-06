@@ -68,6 +68,7 @@ cask "keepassxc"             # Password manager app
 cask "keepingyouawake"       # Tool to prevent the system from going into sleep mode
 cask "livebook"              # Code notebooks for Elixir developers
 cask "loom"                  # Screen and video recording software
+cask "opencode-desktop"      # AI coding agent desktop client
 cask "orbstack"              # Replacement for Docker Desktop
 cask "postico"               # GUI client for PostgreSQL databases
 cask "raycast"               # Control your tools with a few keystrokes
