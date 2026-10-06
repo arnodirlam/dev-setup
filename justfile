@@ -37,7 +37,7 @@ _show-dry-run-message $doit:
     if [[ "$doit" != "true" ]]; then
         echo
         echo -e "{{ BLUE }}💡 This was a dry run. No files were actually modified.{{ NORMAL }}"
-        echo -e "{{ BLUE }}   Run with doit=true to perform the actual operation.{{ NORMAL }}"
+        echo -e "{{ BLUE }}   Pass true as the final argument to apply changes.{{ NORMAL }}"
         echo
     fi
 
