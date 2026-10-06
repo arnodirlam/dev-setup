@@ -5,7 +5,6 @@
 
 dotfiles_dir := justfile_directory() / "dotfiles"
 home_dir := env_var('HOME')
-dotfiles_dir_short := replace_regex(dotfiles_dir, "^" + home_dir, "~")
 brewfile_path := justfile_directory() / "Brewfile"
 omz_plugins_file := justfile_directory() / "omz_plugins"
 omz_plugins_file_short := replace_regex(omz_plugins_file, "^" + home_dir, "~")
@@ -245,7 +244,7 @@ keyboard-install $doit="false": (_cmd "curl") (_cmd "tar") (_cmd "diff") && (_sh
 link $relative_path $doit="false": && (_show-dry-run-message doit)
     @just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link "$relative_path" "$doit"
 
-# Private implementation shared by link and link-all
+# Private implementation shared by link, link-all, and import
 _link $relative_path $doit="false":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -351,62 +350,90 @@ import $relative_path $doit="false": && (_show-dry-run-message doit)
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Determine mode from boolean argument
     [[ "$doit" == "true" ]] && log_prefix="" || log_prefix="[DRY RUN] "
 
-    # Normalize the relative path
-    normalized_path="$(echo "$relative_path" \
-        | sed "s|^dotfiles/||" \
-        | sed "s|^{{ dotfiles_dir }}/||" \
-        | sed "s|^~/||" \
-        | sed "s|^{{ home_dir }}/||" \
-        )"
+    log() {
+        echo -e "${2:-"{{ NORMAL }}"}${log_prefix}${1//"{{ home_dir }}/"/'~/'}{{ NORMAL }}"
+    }
 
-    # Construct paths
+    # Normalize relative path
+    case "$relative_path" in
+        "{{ dotfiles_dir }}/"*) normalized_path=${relative_path#"{{ dotfiles_dir }}/"} ;;
+        "{{ home_dir }}/"*) normalized_path=${relative_path#"{{ home_dir }}/"} ;;
+        dotfiles/*) normalized_path=${relative_path#dotfiles/} ;;
+        '~/'*) normalized_path=${relative_path#'~/'} ;;
+        *) normalized_path=$relative_path ;;
+    esac
+    normalized_path=${normalized_path%/}
+    case "/$normalized_path/" in
+        //*|*/../*|*/./*)
+            log "❌ Invalid relative path: $relative_path" "{{ RED }}" >&2
+            exit 1
+            ;;
+    esac
+
     source_file="{{ dotfiles_dir }}/$normalized_path"
-    source_file_short="{{ dotfiles_dir_short }}/$normalized_path"
     target_file="{{ home_dir }}/$normalized_path"
-    target_file_short="~/$normalized_path"
 
-    # Check if target file exists
-    if [[ ! -e "$target_file" ]]; then
-        echo -e "{{ RED }}❌ Error: Target file does not exist: $target_file_short{{ NORMAL }}" >&2
-        if [[ -e "$source_file" ]]; then
-            echo -e "{{ BLUE }}💡 Did you mean to use 'just link' to link a file?{{ NORMAL }}" >&2
+    # Skip already-imported files and reject other symlinks
+    if [[ -L "$target_file" ]]; then
+        if [[ -f "$source_file" && "$target_file" -ef "$source_file" ]]; then
+            log "🔗 Already imported: $target_file -> $source_file"
+            exit 0
         fi
+        log "❌ Cannot import symlink: $target_file -> $(readlink "$target_file")" "{{ RED }}" >&2
         exit 1
     fi
 
-    # Create parent directories for source file
+    # Require a regular target file and a source file destination
+    if [[ ! -f "$target_file" || -d "$source_file" ]]; then
+        log "❌ Expected regular target and source file paths: $target_file -> $source_file" \
+            "{{ RED }}" >&2
+        exit 1
+    fi
+
+    # Prevent imports through internal symlinks into another location
+    candidate=$(dirname "$normalized_path")
+    while [[ "$candidate" != . ]]; do
+        if [[ -L "{{ dotfiles_dir }}/$candidate" ]]; then
+            log "❌ Cannot import through source directory symlink: $candidate" "{{ RED }}" >&2
+            exit 1
+        fi
+        candidate=$(dirname "$candidate")
+    done
+
+    # Create source parent dir if missing
     source_parent_dir=$(dirname "$source_file")
     if [[ ! -d "$source_parent_dir" ]]; then
-        source_parent_dir_short=$(echo "$source_parent_dir" | sed "s|^{{ home_dir }}|~|")
-        echo -e "{{ BLUE }}${log_prefix}📁 Creating directory: $source_parent_dir_short{{ NORMAL }}"
-        [[ "$doit" == "true" ]] && mkdir -p "$source_parent_dir"
+        log "📁 Creating directory: $source_parent_dir" "{{ BLUE }}"
+        if [[ "$doit" == "true" ]]; then
+            mkdir -p "$source_parent_dir"
+        fi
     fi
 
-    # Backup existing source file if it exists
-    if [[ -f "$source_file" ]]; then
-        echo -e "{{ YELLOW }}${log_prefix}💾 Backing up source file: $source_file_short -> $source_file_short.backup{{ NORMAL }}"
-        [[ "$doit" == "true" ]] && mv "$source_file" "$source_file.backup"
+    # Back up existing source file
+    if [[ -e "$source_file" || -L "$source_file" ]]; then
+        backup_path=$source_file.backup
+        backup_index=0
+        while [[ -e "$backup_path" || -L "$backup_path" ]]; do
+            backup_index=$((backup_index + 1))
+            backup_path=$source_file.backup.$backup_index
+        done
+        log "💾 Backing up existing source file: $source_file -> $backup_path" "{{ BLUE }}"
+        if [[ "$doit" == "true" ]]; then
+            mv "$source_file" "$backup_path"
+        fi
     fi
 
-    # Import the file
-    echo -e "{{ BLUE }}${log_prefix}📥 Importing: $target_file_short -> $source_file_short{{ NORMAL }}"
-
-    # If target is a symlink, resolve it and copy the actual file
-    if [[ -L "$target_file" ]]; then
-        actual_file=$(readlink -f "$target_file")
-        actual_file_short=$(echo "$actual_file" | sed "s|^{{ home_dir }}|~|")
-        echo -e "{{ BLUE }}${log_prefix}(Resolved symlink: $actual_file_short){{ NORMAL }}"
-        [[ "$doit" == "true" ]] && mv "$actual_file" "$source_file"
+    # Move the target file to the source path and link it back
+    log "📥 Importing: $target_file -> $source_file" "{{ GREEN }}"
+    if [[ "$doit" == "true" ]]; then
+        mv "$target_file" "$source_file"
+        just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" \
+            _link "$normalized_path" "$doit"
     else
-        # Copy file from target to source (don't move, so we can create symlink)
-        [[ "$doit" == "true" ]] && mv "$target_file" "$source_file"
+        log "🔗 Linking: $target_file -> $source_file" "{{ GREEN }}"
     fi
-
-    # Now create the symlink back
-    [[ "$doit" == "true" ]] && ln -s "$source_file" "$target_file" || true
 
 # Set the default shell for the user
 set-default-shell $shell $doit="false": && (_show-dry-run-message doit)

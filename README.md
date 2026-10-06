@@ -64,6 +64,8 @@ just import .vimrc true
 
 Linking backs up existing destinations as `.backup`, then `.backup.1`, `.backup.2`, etc., without replacing earlier backups. Already-correct symlinks are left unchanged.
 
+Importing moves regular files into `dotfiles/` and links them back. Other home symlinks are rejected with their stored target shown; they are not resolved or modified. Existing files in `dotfiles/` receive numbered backups; already-imported files are skipped.
+
 **Directory structure:**
 
 ```text

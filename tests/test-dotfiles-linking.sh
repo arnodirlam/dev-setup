@@ -167,4 +167,108 @@ if run_just link-all true 2>/dev/null; then
 fi
 pass
 
-printf '\n%s linking cases passed.\n' "$tests_passed"
+fixture 'import ordinary file'
+mkdir -p "$target_root/dir with spaces"
+printf 'New config\n' > "$target_root/dir with spaces/config file"
+run_just import 'dir with spaces/config file'
+[[ ! -e "$source_root/dir with spaces" && ! -L "$target_root/dir with spaces/config file" ]] || fail 'Import dry run changed files'
+[[ $(cat "$test_root/output") != *'Backing up'* ]] || fail 'Ordinary import preview showed a home backup'
+run_just import 'dir with spaces/config file' true
+assert_link "$target_root/dir with spaces/config file" "$source_root/dir with spaces/config file"
+[[ $(cat "$source_root/dir with spaces/config file") == 'New config' ]] || fail 'Import lost file contents'
+[[ ! -e "$target_root/dir with spaces/config file.backup" ]] || fail 'Ordinary import made a home backup'
+pass
+
+fixture 'import existing source'
+printf 'New config\n' > "$target_root/config"
+printf 'Old config\n' > "$source_root/config"
+touch "$source_root/config.backup"
+ln -s "$test_root/missing" "$source_root/config.backup.1"
+run_just import dotfiles/config true
+assert_link "$target_root/config" "$source_root/config"
+[[ $(cat "$source_root/config") == 'New config' && $(cat "$source_root/config.backup.2") == 'Old config' ]] || fail 'Import overwrote a source backup'
+pass
+
+fixture 'already imported'
+printf 'Config\n' > "$source_root/config"
+ln -s "$source_root/config" "$target_root/config"
+run_just import '~/config'
+run_just import "$target_root/config" true
+assert_link "$target_root/config" "$source_root/config"
+[[ ! -e "$source_root/config.backup" && ! -e "$target_root/config.backup" ]] || fail 'Already-imported file created backups'
+[[ $(cat "$source_root/config") == 'Config' ]] || fail 'Already-imported file was changed'
+pass
+
+fixture 'import symlink rejected'
+printf 'Original\n' > "$target_root/original"
+printf 'Old config\n' > "$source_root/config"
+mkdir -p "$target_root/directory"
+for stored_target in original missing "$target_root/directory"; do
+    ln -s "$stored_target" "$target_root/config"
+    for mode in false true; do
+        if just --justfile "$repo_root/justfile" \
+            --set dotfiles_dir "$source_root" --set home_dir "$target_root" \
+            import config "$mode" > "$test_root/stdout" 2> "$test_root/stderr"; then
+            fail 'Accepted a home symlink to another location'
+        fi
+        display_target=${stored_target//"$target_root/"/'~/'}
+        [[ $(cat "$test_root/stderr") == *"Cannot import symlink: ~/config -> $display_target"* ]] || fail 'Symlink error omitted stored target'
+        [[ ! -s "$test_root/stdout" ]] || fail 'Symlink error was printed to stdout'
+        if [[ "$mode" == false ]]; then
+            [[ $(cat "$test_root/stderr") == *'[DRY RUN]'* ]] || fail 'Dry-run error omitted prefix'
+        fi
+    done
+    assert_link "$target_root/config" "$stored_target"
+    rm "$target_root/config"
+done
+[[ $(cat "$source_root/config") == 'Old config' && $(cat "$target_root/original") == 'Original' ]] || fail 'Rejected symlink import changed files'
+[[ ! -e "$source_root/config.backup" && ! -e "$target_root/config.backup" ]] || fail 'Rejected symlink import made backups'
+pass
+
+fixture 'import rejected'
+mkdir -p "$target_root/directory" "$source_root/destination-dir"
+ln -s missing "$target_root/dangling"
+ln -s directory "$target_root/directory-link"
+touch "$target_root/destination-dir"
+for path in '' . .. ../outside /etc/passwd missing dangling directory directory-link destination-dir; do
+    if run_just import "$path" true 2>/dev/null; then
+        fail "Accepted invalid import: $path"
+    fi
+done
+[[ ! -e "$source_root/destination-dir.backup" ]] || fail 'Rejected import changed source'
+pass
+
+fixture 'import marked directory'
+mkdir -p "$source_root/bundle" "$target_root/bundle"
+touch "$source_root/bundle/.link-directory"
+printf 'Config\n' > "$target_root/bundle/config"
+run_just import bundle/config
+[[ $(cat "$test_root/output") == *'bundle/config ->'* ]] || fail 'Import preview omitted final file link'
+[[ ! -e "$source_root/bundle/config" && ! -e "$target_root/bundle.backup" ]] || fail 'Marked import dry run changed files'
+run_just import bundle/config true
+assert_link "$target_root/bundle" "$source_root/bundle"
+[[ $(cat "$target_root/bundle/config") == 'Config' ]] || fail 'Marked import lost file'
+pass
+
+fixture 'import directory alias'
+mkdir -p "$test_root/alias original" "$target_root/alias"
+ln -s "$test_root/alias original" "$source_root/alias"
+printf 'Home config\n' > "$target_root/alias/config"
+if run_just import alias/config true 2>/dev/null; then
+    fail 'Import wrote through a repository alias'
+fi
+[[ ! -e "$test_root/alias original/config" && -f "$target_root/alias/config" ]] || fail 'Rejected alias import changed files'
+pass
+
+fixture 'import link failure'
+printf 'New config\n' > "$target_root/config"
+mkdir -p "$test_root/failing commands"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$test_root/failing commands/ln"
+chmod +x "$test_root/failing commands/ln"
+if PATH="$test_root/failing commands:$PATH" run_just import config true 2>/dev/null; then
+    fail 'Import hid a link failure'
+fi
+[[ $(cat "$source_root/config") == 'New config' ]] || fail 'Link failure lost imported file'
+pass
+
+printf '\n%s linking/import cases passed.\n' "$tests_passed"
