@@ -283,8 +283,12 @@ _link $relative_path $doit="false":
     target_file_short="~/$normalized_path"
 
     # Unmarked directories retain file-by-file linking.
-    if [[ ! -f "$source_file" && ! ( -d "$source_file" && -f "$source_file/.link-directory" ) ]]; then
-        echo "Expected a file or marked directory: $source_file_short" >&2
+    if [[ -d "$source_file" && ! -f "$source_file/.link-directory" ]]; then
+        just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link-tree "$source_file" "$doit"
+        exit 0
+    fi
+    if [[ ! -f "$source_file" && ! -d "$source_file" ]]; then
+        echo "Expected a file or directory: $source_file_short" >&2
         exit 1
     fi
 
@@ -320,6 +324,10 @@ _link $relative_path $doit="false":
 
 # Link files and marked directories from dotfiles/ to ~/
 link-all $doit="false": && (_show-dry-run-message doit)
+    @just --set dotfiles_dir "{{ dotfiles_dir }}" --set home_dir "{{ home_dir }}" _link-tree "{{ dotfiles_dir }}" "$doit"
+
+# Traverse an unmarked directory for both link and link-all.
+_link-tree $source_dir $doit:
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -327,7 +335,7 @@ link-all $doit="false": && (_show-dry-run-message doit)
     # Materialize the list so traversal failures propagate before linking starts.
     link_list=$(mktemp)
     trap 'rm -f -- "$link_list"' EXIT
-    find "{{ dotfiles_dir }}" -mindepth 1 \
+    find "$source_dir" -mindepth 1 \
         \( -type d -exec test -f '{}/.link-directory' \; -prune -print0 \) -o \
         \( -type f ! -name .link-directory -print0 \) > "$link_list"
     while IFS= read -r -d '' source_path; do
