@@ -39,10 +39,11 @@ writable_roots = [
   "/Users/arno/.dev-browser",
   "/Users/arno/.hex",
   "/Users/arno/.local/share/mise",
-  "/Users/arno/.mise",
-  "/Users/arno/.npm",
+  "/Users/arno/.local/state/mise",
   "/Users/arno/.npm_ex",
+  "/Users/arno/.npm",
   "/Users/arno/.ollama",
+  "/Users/arno/Library/Caches/mise",
 ]
 
 [desktop]
@@ -70,6 +71,8 @@ notifications-turn-mode = "always"
 conversationDetailMode = "STEPS_COMMANDS"
 show-context-window-usage = true
 dock-icon-preference = "codex-system"
+open-link-in-target-preference = "external-browser"
+open-local-url-in-target-preference = "external-browser"
 
 [desktop.open-in-target-preferences]
-global = "cursor"
+global = "vscode"

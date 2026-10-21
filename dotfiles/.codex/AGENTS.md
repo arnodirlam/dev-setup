@@ -33,9 +33,12 @@
 - even when asked to 'change staged files', read staged changes but don't update index by default
 - when any staged files are in the way, offer to make a commit when on a feature branch, or to stash staged files
 - don't modify any other branches that you're not explicitly told to modify
+- Sign commits and verify their signatures before pushing; never push unsigned commits.
+- For worktrees used to continue branch or PR work, check out the existing branch after creation if it is not checked out elsewhere. If separate work requires isolation, create a named branch. Leave HEAD detached only for intentional snapshot inspection.
 
 # Tool usage
 
+- Prefer the built-in edit tool for source, configuration, and documentation changes the user should review. Try it before assuming elevated permissions are needed. Shell commands are fine for temporary experiments, generated files, logs, and other disposable output.
 - Whenever you'd need a cli/mcp tool installed in order to complete a task in a much simpler/better way, ask the user to install it - preferably via homebrew or mise
 
 # Package Update Policy
