@@ -27,6 +27,10 @@
 - Do not add unrequested features, speculative abstractions, future scaffolding, or avoidable dependencies. Choose the smallest clear diff that fully meets the request.
 - Minimalism never overrides correctness, readability, edge cases, validation, error handling, security, accessibility, data-loss protection, or project test conventions.
 
+# Issues and Pull Requests
+
+- Apply `$repo-collab` when preparing or updating issues, proposals, PRs, or maintainer follow-ups.
+
 # Git Safety
 
 - don't do any actions that change the index, unless explicitly asked to
