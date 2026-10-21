@@ -12,7 +12,7 @@ export ZSH="/Users/arno/.oh-my-zsh"
 # ZSH_THEME="fishy"
 # ZSH_THEME="robbyrussell"
 # ZSH_THEME="awesomepanda"
-ZSH_THEME="sorins2"
+ZSH_THEME="sorin"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
