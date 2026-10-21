@@ -15,6 +15,12 @@
 
 - Always use Context7 MCP when I need library/API documentation, code generation, setup, or configuration steps, without me having to explicitly ask.
 
+# Agent Skills
+
+- Create and update user-wide agent skills in `~/dev/dev-setup/dotfiles/.agents/skills/<skill-name>/`.
+- On creation, add an empty `.link-directory` file inside the skill directory, then run `just link .agents/skills/<skill-name> true` from `~/dev/dev-setup` to link the whole directory into `~/.agents/skills/`.
+- Symlinks expose repo edits immediately, including new files within linked skill directories; no copying or relinking needed. Agents detect skill changes automatically in running sessions. If a new skill or update does not appear, ask the user to restart the agent.
+
 # UI tests
 
 - You can test UI changes in your browser, if it makes sense.
@@ -22,10 +28,18 @@
 
 # Implementation Simplicity
 
+- When an experimental implementation could inform a decision, propose its scope and wait for confirmation before building it. Keep it isolated and use the findings to explain the options.
 - Understand the affected flow before editing. Fix root causes at the narrowest shared layer; inspect affected callers.
 - Before adding code or dependencies, prefer existing project code, then the standard library, native platform features, and installed dependencies.
 - Do not add unrequested features, speculative abstractions, future scaffolding, or avoidable dependencies. Choose the smallest clear diff that fully meets the request.
 - Minimalism never overrides correctness, readability, edge cases, validation, error handling, security, accessibility, data-loss protection, or project test conventions.
+
+# Tests and Documentation
+
+- Before adding or changing tests or documentation, inspect nearby examples and existing coverage. Match the project's style, structure, and verbosity.
+- Extend existing tests and fixtures where appropriate; add focused cases for missing behavior rather than duplicating coverage or creating verbose parallel suites.
+- Check existing expected output for correctness; do not preserve a bug merely because a fixture already contains it.
+- Document options at the same level of detail as neighboring options. Run appropriate checks, but omit routine passing-check reports from issues and PRs unless required by the project; disclose relevant failures, limitations, and verification gaps.
 
 # Issues and Pull Requests
 
