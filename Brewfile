@@ -63,7 +63,7 @@ cask "ghostty"               # Terminal emulator that uses platform-native UI an
 cask "gimp"                  # Free and open-source image editor
 cask "google-chrome"         # Web browser
 cask "google-drive"          # Client for the Google Drive storage service
-cask "karabiner-elements"    # Keyboard customiser
+cask "hammerspoon"           # Desktop automation application
 cask "keepassxc"             # Password manager app
 cask "keepingyouawake"       # Tool to prevent the system from going into sleep mode
 cask "livebook"              # Code notebooks for Elixir developers
