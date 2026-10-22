@@ -19,6 +19,14 @@
 
 - Always use Context7 MCP when I need library/API documentation, code generation, setup, or configuration steps, without me having to explicitly ask.
 
+# Improving Shared Instructions and Skills
+
+- `~/.codex/AGENTS.md` is the shared instruction source, loaded automatically for you, directly or through an alias.
+- `~/.agents/skills/` holds shared skills. You discover them automatically and load full skill instructions when relevant, according to your harness's loading rules.
+- Look for reusable improvements when you notice repeated corrections, missing guidance, or a workflow that would benefit from a skill. Suggest edits or additions to either location.
+- Propose a concise change and explain its benefit. Prefer improving existing guidance over adding duplicates; keep project-specific lessons in the project's own instructions or skills.
+- Suggest improvements without interrupting the task. Don't edit shared instructions or skills without the user's approval.
+
 # UI tests
 
 - You can test UI changes in your browser, if it makes sense.
@@ -83,7 +91,28 @@
 - Some canonical recipes: `check` for all checks, `start` for local development, `format`, `setup`
   - these can have more specific recipes as dependencies, e.g. `test`, `setup-backend`, ...
 - CI steps should use these recipes, not have their own scripts
-- In a `Justfile` or `.md` file, wrap lines you add or change at 100 characters
+- When changing Bash recipes, add a concise one-line comment before each major check or block. Explain its purpose and omit the trailing period
+- In Bash recipes, flatten nested condition groups using the same operator (`&&` or `||`). Keep grouping only where needed to preserve mixed-operator logic.
+- In a `Justfile`, wrap lines you add or change at 100 characters.
+- Once a condition wraps, put each condition or nested group on its own line, aligned with the first condition. Keep operators at line ends and the closing `]]` aligned with `if`:
+  ```bash
+  if [[ ! -L "$source_file" &&
+        ! -f "$source_file" &&
+        ! -f "$source_file/.link-directory"
+  ]]; then
+      ...
+  fi
+  ```
+
+# Formatting
+
+- Use meaningful emojis and colors for human-facing messages. Use green for main actions toward the goal, blue for auxiliary actions such as backups and directory creation, neutral for already-correct states, yellow for warnings needing attention, and red for errors.
+- Print each action as a complete line before execution, without a trailing success mark.
+- Dry runs print the same action with `[DRY RUN]`.
+- Let commands print errors directly to stderr and preserve failure status.
+- Keep machine-readable output free of colors and emojis.
+- Print normal progress, successful actions, and dry-run previews to stdout. Print errors and warnings needing attention to stderr; routine backup messages stay on stdout.
+- Keep printing helpers stream-neutral; callers redirect to stderr with `>&2` when needed.
 
 # Elixir
 
@@ -92,7 +121,8 @@
 
 # Secret Safety (Hard Deny by Default)
 
-- Deny any command that references `.env*`, `.envrc*`, or sensitive variable names/patterns, even if it does not directly read or print values.
+- Deny commands that read secret files or may expose sensitive values.
+- Existence checks and metadata-only checks are allowed when they do not read secret contents.
 
 ## Never Read Secret Env Files
 
@@ -101,7 +131,8 @@
 
 ## Never Print Sensitive Environment Values
 
-- Never run environment dump commands: `env`, `printenv` (without a specific safe variable), `export`, `export -p`, or `export --`.
+- Never dump the environment with bare `env`, unrestricted `printenv`, bare `export`, or `export -p`.
+- Assigning or exporting non-sensitive values is allowed; don't expose secrets in commands or output.
 - Never print sensitive variables via `echo`, `printf`, `printenv`, `${...}`, command substitution, or `eval`.
 - Never search environment output for sensitive patterns (for example `env | grep TOKEN`).
 
