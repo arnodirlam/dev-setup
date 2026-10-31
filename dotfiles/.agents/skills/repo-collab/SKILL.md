@@ -67,6 +67,14 @@ description: Prepare or update repository issues, feature proposals, pull reques
 - Keep feedback within the PR's scope. Suggest follow-up work for unrelated concerns.
 - Read the author's explanations and reassess against the agreed direction. Explain newly discovered requirements rather than silently moving the goalposts.
 
+## Triage incoming issues and PRs
+
+- Assess the underlying problem separately from the proposed solution, and check whether it fits the project's goals and constraints.
+- For issues, establish current and expected behavior. Ask only for information needed to reproduce the problem or decide how it fits. Acknowledge reports without implying a commitment to implement them.
+- For PRs, decide whether the change and direction are wanted before requesting substantial revisions or polish.
+- Explain acceptance, deferral, or rejection in terms of project goals, compatibility, complexity, or maintenance cost. Clarify ownership and priority when follow-up work is agreed; do not imply contributors are obliged to continue.
+- Explain project constraints contributors may not know. For colleagues, reference relevant team decisions and bring context from private discussions into the issue or PR where appropriate for its audience.
+
 ## Respond to review feedback
 
 - Read the review and inspect affected code, then propose a numbered action list covering code changes, draft replies, and threads to leave untouched. Refine it with the user before changing code or posting replies, then execute the agreed batch after confirmation. If new findings require a material change of plan, bring that decision back to the user.
