@@ -58,6 +58,15 @@ description: Prepare or update repository issues, feature proposals, pull reques
 - Run appropriate validation, but omit routine success reports, test counts, and validation sections unless the project requires them or the evidence resolves a substantive concern. Disclose failures and relevant verification gaps.
 - For an unsolicited feature PR, a brief "Feel free to close this PR if it isn't wanted" can be appropriate; do not add it mechanically to every contribution.
 
+## Review PRs
+
+- Read the PR description, related issue, project guidance, and affected code and callers before judging the diff. Verify whether the reported behavior is introduced or exposed by the change.
+- Make each finding actionable: explain the scenario and consequence, and state the change or decision needed.
+- Distinguish correctness problems, design concerns, optional suggestions, and questions. State which changes block approval and why; do not present personal preference as a project requirement.
+- Check whether tests and fixtures meaningfully cover the behavior, and disclose relevant verification gaps.
+- Keep feedback within the PR's scope. Suggest follow-up work for unrelated concerns.
+- Read the author's explanations and reassess against the agreed direction. Explain newly discovered requirements rather than silently moving the goalposts.
+
 ## Respond to review feedback
 
 - Read the review and inspect affected code, then propose a numbered action list covering code changes, draft replies, and threads to leave untouched. Refine it with the user before changing code or posting replies, then execute the agreed batch after confirmation. If new findings require a material change of plan, bring that decision back to the user.
