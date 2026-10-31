@@ -36,6 +36,13 @@ description: Prepare or update repository issues, feature proposals, pull reques
 - For unresolved design tradeoffs, lay out the viable options and their consequences for the maintainer to choose before treating an approach as settled. If you have a preference, state it at the end, after the options and question. Keep this conversational and personal.
 - Propose experimental implementations, and wait for confirmation before building them. Keep them isolated and out of the PR until the maintainer agrees on the direction. Use the findings to explain the options, distinguishing demonstrated behavior from remaining uncertainties.
 
+## Review project and issue coherence
+
+- Read the project description and all issues in the requested scope. Compare them with supplied requirements and decisions, and with each other.
+- Look for conflicting terminology or behavior, duplicated scope, missing work, and issues that exceed agreed requirements.
+- Point to the specific project or issue text behind each finding. Distinguish confirmed mismatches from questions that need a product or project decision.
+- A request to review authorizes investigation and findings. Before changing someone else's descriptions, follow the exact-edit proposal guidance above.
+
 ## Prepare PRs
 
 - Lead with the problem and resulting behavior. In PRs and technical proposals, explain design choices, tradeoffs, and meaningful limitations; omit implementation details readily visible in the diff.
