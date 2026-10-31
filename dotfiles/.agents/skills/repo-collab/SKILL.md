@@ -43,6 +43,15 @@ description: Prepare or update repository issues, feature proposals, pull reques
 - Point to the specific project or issue text behind each finding. Distinguish confirmed mismatches from questions that need a product or project decision.
 - A request to review authorizes investigation and findings. Before changing someone else's descriptions, follow the exact-edit proposal guidance above.
 
+## Author ADRs and decision proposals
+
+- Follow the repository's ADR template. For a Michael Nygard-style ADR, use Title, Status, Context, Decision, and Consequences.
+- Write for peers evaluating the decision and engineers who may later need to understand why the codebase looks this way. Keep each sentence useful to one or both readers.
+- When an options table is used, let it carry the pros and cons. Use surrounding prose to explain the weighting and trade-offs without repeating the table.
+- Preserve concrete facts such as numbers, vendors, risks, and rejected options. Do not invent rationale; flag claims that need evidence, for example with `[needs source]`.
+- Make the chosen option, reasons, consequences, rejected alternatives, and conditions that could invalidate the decision clear where they are known and relevant.
+- When asked to sharpen an existing ADR, improve clarity without adding claims or rationale. Identify missing information instead of filling gaps by inference.
+
 ## Prepare PRs
 
 - Lead with the problem and resulting behavior. In PRs and technical proposals, explain design choices, tradeoffs, and meaningful limitations; omit implementation details readily visible in the diff.
